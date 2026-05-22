@@ -37,7 +37,7 @@ void rau_sincos(float in_rad, float *sin_out, float *cos_out) {
     // Diagonal to unit circle
     float omw = 1.0f - w;
     float D   = omw*omw + w*w;    // = 1 - 2w(1-w)
-    float inv = 1.0f / sqrtf(D);  // Trig formulae:
+    float inv = 1.0f / SDL_sqrtf(D);  // Trig formulae:
     float cs  = omw * inv;        // (1-w) ÷ sqrt(1 + 2×w + 2×w^2)
     float sn  = w   * inv;        //  w ÷ sqrt(1 + 2×w + 2×w^2)
 
@@ -48,12 +48,12 @@ void rau_sincos(float in_rad, float *sin_out, float *cos_out) {
     uint32_t ssign = (uint32_t)( (quadrant_index>>1)    & 1) << 31;
 
     uint32_t cs_bits, sn_bits;
-    memcpy(&cs_bits, &cs, 4);
-    memcpy(&sn_bits, &sn, 4);
+    SDL_memcpy(&cs_bits, &cs, 4);
+    SDL_memcpy(&sn_bits, &sn, 4);
     cs_bits ^= csign;
     sn_bits ^= ssign;
-    memcpy(cos_out, &cs_bits, 4);
-    memcpy(sin_out, &sn_bits, 4);
+    SDL_memcpy(cos_out, &cs_bits, 4);
+    SDL_memcpy(sin_out, &sn_bits, 4);
 }
 
 // Convenience wrappers
@@ -72,7 +72,7 @@ float rau_tanf(float x) {
     float s, c; rau_sincos(x, &s, &c);
     // this version — acceptable for games/graphics where
     // a missed spike is better than a NaN if user knows it's determined?
-    return (fabsf(c) < 1e-6f) ? 0.0f : s / c;
+    return (SDL_fabsf(c) < 1e-6f) ? 0.0f : s / c;
 }
 
 /* LICENSE

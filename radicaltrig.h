@@ -2,8 +2,9 @@
 #define RADICALTRIG_H
 
 #include <stdint.h>
-#include <string.h> // memcpy for bitcast
-#include <math.h> //for sqrt (or include SDL.h for SDL_sqrtf)
+#include <SDL.h>
+//#include <string.h> // memcpy for bitcast
+//#include <math.h> //for sqrt (or include SDL.h for SDL_sqrtf)
 
 void rau_sincos(float in_rad, float *sin_out, float *cos_out);
 
