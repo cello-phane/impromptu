@@ -1,8 +1,6 @@
 #ifndef TRI_H
 #define TRI_H
 
-#include <stdlib.h>
-
 #include "vertex.h"
 
 struct Tri {

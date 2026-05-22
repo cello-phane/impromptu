@@ -1,9 +1,6 @@
 #ifndef MATRIX4_H
 #define MATRIX4_H
 
-#include <stdio.h>
-#include <math.h>
-
 #include "vector3.h"
 
 struct Matrix4 {
@@ -21,16 +18,16 @@ struct Vector3; // Forward declaration.
 // We move Matrix4 instances with stack pointers.
 
 // Operations.
-inline void           Matrix4_add(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out);
-inline void           Matrix4_sub(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out);
-inline void           Matrix4_mul(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out);
-inline void           Matrix4_smul(const struct Matrix4 *a, float s, struct Matrix4 *out);
-inline struct Vector3 Matrix4_vmul(const struct Matrix4 *a, struct Vector3 v);
-inline void           Matrix4_transpose(const struct Matrix4 *a, struct Matrix4 *out);
-inline float          Matrix4_tr(const struct Matrix4 *a);
-inline float          Matrix4_det(const struct Matrix4 *a);
-inline void           Matrix4_inverse(const struct Matrix4 *a, struct Matrix4 *out);
-inline void           Matrix4_copy(const struct Matrix4 *a, struct Matrix4 *out);
+void           Matrix4_add(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out);
+void           Matrix4_sub(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out);
+void           Matrix4_mul(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out);
+void           Matrix4_smul(const struct Matrix4 *a, float s, struct Matrix4 *out);
+struct Vector3 Matrix4_vmul(const struct Matrix4 *a, struct Vector3 v);
+void           Matrix4_transpose(const struct Matrix4 *a, struct Matrix4 *out);
+float          Matrix4_tr(const struct Matrix4 *a);
+float          Matrix4_det(const struct Matrix4 *a);
+void           Matrix4_inverse(const struct Matrix4 *a, struct Matrix4 *out);
+void           Matrix4_copy(const struct Matrix4 *a, struct Matrix4 *out);
 
 // Transformations.
 
@@ -47,10 +44,10 @@ void        Matrix4_rotate_xyz(float rx, float ry, float rz, struct Matrix4 *out
 void        Matrix4_scale(float sx, float sy, float sz, struct Matrix4 *out);
 
 void        Matrix4_perspective(float fov, float aspect_ratio, float znear, float zfar, struct Matrix4 *out);
-inline void Matrix4_look_at(struct Vector3 eye, struct Vector3 target, struct Vector3 up, struct Matrix4 *out);
-inline void Matrix4_viewport(int window_width, int window_height, struct Matrix4 *out);
+void Matrix4_look_at(struct Vector3 eye, struct Vector3 target, struct Vector3 up, struct Matrix4 *out);
+void Matrix4_viewport(int window_width, int window_height, struct Matrix4 *out);
 
 // Utility.
-inline void Matrix4_print(const struct Matrix4 *a);
+void Matrix4_print(const struct Matrix4 *a);
 
 #endif

@@ -1,10 +1,7 @@
 #ifndef ENGINE_H
 #define ENGINE_H
 
-#include <stdio.h>
-#include <string.h>
-
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #include "model.h"
 #include "vector3.h"
@@ -47,11 +44,11 @@ struct Engine *Engine_create(int window_width, int window_height);
 void           Engine_destroy(struct Engine *e);
 
 // Raster.
-inline void    Engine_set_pixel(struct Engine *e, int x, int y, int r, int g, int b);
-inline void    Engine_set_depth(struct Engine *e, int x, int y, float depth);
-inline float   Engine_get_depth(struct Engine *e, int x, int y);
-inline void    Engine_bresenham(struct Engine *e, int x1, int y1, int x2, int y2, int r, int g, int b);
-inline void    Engine_raster_tri_wireframe(struct Engine *e, struct Vector3 v1, struct Vector3 v2, struct Vector3 v3, int r, int g, int b);
+void    Engine_set_pixel(struct Engine *e, int x, int y, int r, int g, int b);
+void    Engine_set_depth(struct Engine *e, int x, int y, float depth);
+float   Engine_get_depth(struct Engine *e, int x, int y);
+void    Engine_bresenham(struct Engine *e, int x1, int y1, int x2, int y2, int r, int g, int b);
+void    Engine_raster_tri_wireframe(struct Engine *e, struct Vector3 v1, struct Vector3 v2, struct Vector3 v3, int r, int g, int b);
 
 void           Engine_run(struct Engine *e);
 

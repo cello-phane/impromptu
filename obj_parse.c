@@ -1,14 +1,32 @@
-#include "obj_parse.h"
+#include <SDL.h>
 
-inline void split_space(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n) {
+#include "obj_parse.h"
+#include "util.h"
+
+// fgets-equivalent on top of SDL_RWops. Reads up to max-1 bytes or until '\n'
+// (which is included), null-terminates, and returns NULL at EOF before any read.
+static char *rw_fgets(char *buf, int max, SDL_RWops *rw) {
+    int i = 0;
+    char c;
+    while (i < max - 1) {
+        if (SDL_RWread(rw, &c, 1, 1) == 0) break;
+        buf[i++] = c;
+        if (c == '\n') break;
+    }
+    if (i == 0) return NULL;
+    buf[i] = '\0';
+    return buf;
+}
+
+void split_space(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n) {
     int i = 0; // Line string index.
     int j = 0; // Substring index.
     int k = 0; // Out string array index.
 
     char ss[MAX_LSS];
-    
+
     while (line[i] != '\0') {
-        
+
         // Skip any whitespaces.
         while (line[i] == ' ') ++i;
 
@@ -22,21 +40,21 @@ inline void split_space(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n
         ss[j] = '\0';
 
         // Write to out.
-        strcpy(out[k++], ss);
+        SDL_strlcpy(out[k++], ss, MAX_LSS);
     }
 
     *out_n = k;
 }
 
-inline void split_slash(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n) {
+void split_slash(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n) {
     int i = 0;
     int j = 0;
     int k = 0;
 
     char ss[MAX_LSS];
-    
+
     while (line[i] != '\0') {
-        
+
         // Skip a single slash.
         if (line[i] == '/') ++i;
 
@@ -47,13 +65,13 @@ inline void split_slash(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n
         }
 
         ss[j] = '\0';
-        strcpy(out[k++], ss);
+        SDL_strlcpy(out[k++], ss, MAX_LSS);
     }
 
     *out_n = k;
 }
 
-inline struct Tri *parse_obj(const char *file_name, int *out_n) {
+struct Tri *parse_obj(const char *file_name, int *out_n) {
     int nv  = 0; // Vertex.
     int nvt = 0; // Vertex texture.
     int nvn = 0; // Vertex normal.
@@ -66,28 +84,31 @@ inline struct Tri *parse_obj(const char *file_name, int *out_n) {
     int  len_slash_split_arr;
     char *keyword;
 
-    FILE *fp = fopen(file_name, "r");
+    SDL_RWops *fp = SDL_RWFromFile(file_name, "r");
 
     // Count vertex data and face elements.
-    while (fgets(line, MAX_LL, fp)) {
+    while (rw_fgets(line, MAX_LL, fp)) {
         split_space(line, space_split_arr, &len_space_split_arr);
         keyword = space_split_arr[0];
 
-        if      (strcmp("v" , keyword) == 0) ++nv;
-        else if (strcmp("vt", keyword) == 0) ++nvt;
-        else if (strcmp("vn", keyword) == 0) ++nvn;
-        else if (strcmp("f" , keyword) == 0) ++nf;
+        if      (SDL_strcmp("v" , keyword) == 0) ++nv;
+        else if (SDL_strcmp("vt", keyword) == 0) ++nvt;
+        else if (SDL_strcmp("vn", keyword) == 0) ++nvn;
+        else if (SDL_strcmp("f" , keyword) == 0) ++nf;
     }
 
-    fseek(fp, 0, SEEK_SET);
-    
+    SDL_RWseek(fp, 0, RW_SEEK_SET);
+
     // Vertex position, texture coordinate, and normal storage.
-    struct Vector3 *v  = malloc(sizeof(struct Vector3) * nv );
-    struct Vector3 *vt = malloc(sizeof(struct Vector3) * nvt);
-    struct Vector3 *vn = malloc(sizeof(struct Vector3) * nvn);
+    struct Vector3 *v  = SDL_malloc(sizeof(struct Vector3) * nv );
+    struct Vector3 *vt = SDL_malloc(sizeof(struct Vector3) * nvt);
+    struct Vector3 *vn = SDL_malloc(sizeof(struct Vector3) * nvn);
 
     // Mesh to return.
-    struct Tri *f = malloc(sizeof(struct Tri) * nf);
+    struct Tri *f = SDL_malloc(sizeof(struct Tri) * nf);
+
+    // PRNG state for per-face vertex colors.
+    Uint64 rng = 1;
 
     // Storage indeces.
     int vi  = 0; // Vertex.
@@ -106,53 +127,53 @@ inline struct Tri *parse_obj(const char *file_name, int *out_n) {
     //int            num_mtl;
 
     // Populate storage.
-    while (fgets(line, MAX_LL, fp)) {
+    while (rw_fgets(line, MAX_LL, fp)) {
         split_space(line, space_split_arr, &len_space_split_arr);
         keyword = space_split_arr[0];
 
-        if (strcmp("v", keyword) == 0) {
+        if (SDL_strcmp("v", keyword) == 0) {
             v[vi++] = (struct Vector3){
-                atof(space_split_arr[1]), 
-                atof(space_split_arr[2]), 
-                atof(space_split_arr[3]),
+                SDL_atof(space_split_arr[1]),
+                SDL_atof(space_split_arr[2]),
+                SDL_atof(space_split_arr[3]),
                 1,
             };
-        } else if (strcmp("vt", keyword) == 0) {
+        } else if (SDL_strcmp("vt", keyword) == 0) {
             vt[vti++] = (struct Vector3){
-                atof(space_split_arr[1]), 
-                atof(space_split_arr[2]), 
+                SDL_atof(space_split_arr[1]),
+                SDL_atof(space_split_arr[2]),
                 0, // Unused z.
-                0  // Unused w. 
+                0  // Unused w.
             };
-        } else if (strcmp("vn", keyword) == 0) {
+        } else if (SDL_strcmp("vn", keyword) == 0) {
             vn[vni++] = (struct Vector3){
-                atof(space_split_arr[1]), 
-                atof(space_split_arr[2]), 
-                atof(space_split_arr[3]),
+                SDL_atof(space_split_arr[1]),
+                SDL_atof(space_split_arr[2]),
+                SDL_atof(space_split_arr[3]),
                 0
             };
-        } else if (strcmp("f", keyword) == 0) {
+        } else if (SDL_strcmp("f", keyword) == 0) {
             // Assume a triangular face (i.e. 3 vertices).
             struct Tri tmpt;
             struct Vertex tmpv;
             for (int i = 1; i < 4; ++i) {
                 split_slash(space_split_arr[i], slash_split_arr, &len_slash_split_arr);
-            
-                vref = atoi(slash_split_arr[0]); // Required vertex reference.
-                tmpv.pos = v[vref - 1];
-                tmpv.col.x = rand() % 256;
-                tmpv.col.y = rand() % 256;
-                tmpv.col.z = rand() % 256;
 
-                if (len_slash_split_arr >= 2 && strcmp("", slash_split_arr[1]) != 0) { // Optional texture coordinate reference.
-                    vtref = atoi(slash_split_arr[1]);
+                vref = SDL_atoi(slash_split_arr[0]); // Required vertex reference.
+                tmpv.pos = v[vref - 1];
+                tmpv.col.x = rand32(&rng) & 0xff;
+                tmpv.col.y = rand32(&rng) & 0xff;
+                tmpv.col.z = rand32(&rng) & 0xff;
+
+                if (len_slash_split_arr >= 2 && SDL_strcmp("", slash_split_arr[1]) != 0) { // Optional texture coordinate reference.
+                    vtref = SDL_atoi(slash_split_arr[1]);
                     (void)vtref; // NO-OP.
                     //tmpv.tex_u  = vt[vtref - 1].x;
                     //tmpv.tex_v  = vt[vtref - 1].y;
-                } 
+                }
 
-                if (len_slash_split_arr == 3 && strcmp("", slash_split_arr[2]) != 0) { // Optional vertex normal reference.
-                    vnref = atoi(slash_split_arr[2]);
+                if (len_slash_split_arr == 3 && SDL_strcmp("", slash_split_arr[2]) != 0) { // Optional vertex normal reference.
+                    vnref = SDL_atoi(slash_split_arr[2]);
                     tmpv.norm = vn[vnref - 1];
                 }
 
@@ -160,24 +181,24 @@ inline struct Tri *parse_obj(const char *file_name, int *out_n) {
                     case 1: tmpt.v0 = tmpv; break;
                     case 2: tmpt.v1 = tmpv; break;
                     case 3: tmpt.v2 = tmpv; break;
-                } 
+                }
             }
 
             f[fi++] = tmpt;
         }
     }
 
-    fclose(fp);
-    free(v);
-    free(vt);
-    free(vn);
-    
+    SDL_RWclose(fp);
+    SDL_free(v);
+    SDL_free(vt);
+    SDL_free(vn);
+
     *out_n = nf;
     return f;
 }
 
 // inline void parse_mtl(const char *file_name, struct Obj_mtl *out, int *out_n) {
-//     FILE *fp = fopen("models/casa.mtl", "r");
+//     FILE *fp = fopen("models/benz.mtl", "r");
 
 //     char line[MAX_LEN_LINE];
 //     char s[MAX_NUM_SUBSTR][MAX_LEN_SUBSTR];

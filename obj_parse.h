@@ -1,9 +1,6 @@
 #ifndef OBJ_PARSE
 #define OBJ_PARSE
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "vector3.h"
 #include "model.h"
 
@@ -19,10 +16,9 @@ struct Obj_mtl {
     struct Vector3 kd;
 };
 
-inline void split_space(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n);
-inline void split_slash(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n);
+void split_space(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n);
+void split_slash(const char *line, char out[MAX_NSS][MAX_LSS], int *out_n);
 
-inline struct Tri *parse_obj(const char *file_name, int *out_n); // Outputs a heap allocated mesh.
-inline void parse_mtl(const char *file_name, struct Obj_mtl *out, int *out_n);
+struct Tri *parse_obj(const char *file_name, int *out_n); // Outputs a heap allocated mesh.
 
 #endif

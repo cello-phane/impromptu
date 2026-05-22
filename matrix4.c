@@ -1,9 +1,12 @@
-#include "matrix4.h"
+#include <SDL.h>
 
-// For next to no reason, the code convention we adopt for the following 
+#include "matrix4.h"
+#include "radicaltrig.h"
+
+// For next to no reason, the code convention we adopt for the following
 // implementations is: "What's an array? What's a loop?"
 
-inline void Matrix4_add(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out) {
+void Matrix4_add(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out) {
     out->x00 = a->x00 + b->x00;
     out->x01 = a->x01 + b->x01;
     out->x02 = a->x02 + b->x02;
@@ -22,7 +25,7 @@ inline void Matrix4_add(const struct Matrix4 *a, const struct Matrix4 *b, struct
     out->x33 = a->x33 + b->x33;
 }
 
-inline void Matrix4_sub(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out) {
+void Matrix4_sub(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out) {
     out->x00 = a->x00 - b->x00;
     out->x01 = a->x01 - b->x01;
     out->x02 = a->x02 - b->x02;
@@ -41,7 +44,7 @@ inline void Matrix4_sub(const struct Matrix4 *a, const struct Matrix4 *b, struct
     out->x33 = a->x33 - b->x33;
 }
 
-inline void Matrix4_mul(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out) {
+void Matrix4_mul(const struct Matrix4 *a, const struct Matrix4 *b, struct Matrix4 *out) {
     float a00 = a->x00;
     float a01 = a->x01;
     float a02 = a->x02;
@@ -92,7 +95,7 @@ inline void Matrix4_mul(const struct Matrix4 *a, const struct Matrix4 *b, struct
     out->x33 = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
 }
 
-inline void Matrix4_smul(const struct Matrix4 *a, float s, struct Matrix4 *out) {
+void Matrix4_smul(const struct Matrix4 *a, float s, struct Matrix4 *out) {
     out->x00 = a->x00 * s;
     out->x01 = a->x01 * s;
     out->x02 = a->x02 * s;
@@ -111,7 +114,7 @@ inline void Matrix4_smul(const struct Matrix4 *a, float s, struct Matrix4 *out) 
     out->x33 = a->x33 * s;
 }
 
-inline struct Vector3 Matrix4_vmul(const struct Matrix4 *a, struct Vector3 v) {
+struct Vector3 Matrix4_vmul(const struct Matrix4 *a, struct Vector3 v) {
     return (struct Vector3) {
         v.x * a->x00 + v.y * a->x01 + v.z * a->x02 + v.w * a->x03,
         v.x * a->x10 + v.y * a->x11 + v.z * a->x12 + v.w * a->x13,
@@ -120,7 +123,7 @@ inline struct Vector3 Matrix4_vmul(const struct Matrix4 *a, struct Vector3 v) {
     };
 }
 
-inline void Matrix4_transpose(const struct Matrix4 *a, struct Matrix4 *out) {
+void Matrix4_transpose(const struct Matrix4 *a, struct Matrix4 *out) {
     out->x00 = a->x00;
     out->x01 = a->x10;
     out->x02 = a->x20;
@@ -139,7 +142,7 @@ inline void Matrix4_transpose(const struct Matrix4 *a, struct Matrix4 *out) {
     out->x33 = a->x33;
 }
 
-inline float Matrix4_tr(const struct Matrix4 *a) {
+float Matrix4_tr(const struct Matrix4 *a) {
     return a->x00 + a->x11 + a->x22 + a->x33;
 }
 
@@ -196,15 +199,15 @@ float Matrix4_det(const struct Matrix4 *m) {
     float det03 = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
 
     return m->x00 * det00 - m->x01 * det01 + m->x02 * det02 - m->x03 * det03;
-}               
+}
 
-inline void Matrix4_inverse(const struct Matrix4 *a, struct Matrix4 *out) {
+void Matrix4_inverse(const struct Matrix4 *a, struct Matrix4 *out) {
     // https://en.wikipedia.org/wiki/Invertible_matrix#Analytic_solution
     // Cayley–Hamilton method.
 
     struct Matrix4 a2;
     struct Matrix4 a3;
-    
+
     Matrix4_mul(a, a, &a2);
     Matrix4_mul(&a2, a, &a3);
 
@@ -235,7 +238,7 @@ inline void Matrix4_inverse(const struct Matrix4 *a, struct Matrix4 *out) {
     Matrix4_smul(out, inv_det_a, out);
 }
 
-inline void Matrix4_copy(const struct Matrix4 *a, struct Matrix4 *out) {
+void Matrix4_copy(const struct Matrix4 *a, struct Matrix4 *out) {
     out->x00 = a->x00;
     out->x01 = a->x01;
     out->x02 = a->x02;
@@ -297,38 +300,38 @@ void Matrix4_translate(float dx, float dy, float dz, struct Matrix4 *out) {
 void Matrix4_rotate_x(float r, struct Matrix4 *out) {
     Matrix4_zero(out);
 
-    float theta = RAD(r);
-
+    //float theta = RAD(r);
+    float theta = r*(1.0f/90.0f);
     out->x00 = 1;
-    out->x11 = cosf(theta);
-    out->x12 = -sinf(theta);
-    out->x21 = sinf(theta);
-    out->x22 = cosf(theta);
+    out->x11 = rau_cosf(theta);
+    out->x12 = -rau_sinf(theta);
+    out->x21 = rau_sinf(theta);
+    out->x22 = rau_cosf(theta);
     out->x33 = 1;
 }
 
 void Matrix4_rotate_y(float r, struct Matrix4 *out) {
     Matrix4_zero(out);
 
-    float theta = RAD(r);
-
-    out->x00 = cosf(theta);
-    out->x02 = sinf(theta);
+    //float theta = RAD(r);
+    float theta = r*(1.0f/90.0f);
+    out->x00 = rau_cosf(theta);
+    out->x02 = rau_sinf(theta);
     out->x11 = 1;
-    out->x20 = -sinf(theta);
-    out->x22 = cosf(theta);
+    out->x20 = -rau_sinf(theta);
+    out->x22 = rau_cosf(theta);
     out->x33 = 1;
 }
 
 void Matrix4_rotate_z(float r, struct Matrix4 *out) {
     Matrix4_zero(out);
 
-    float theta = RAD(r);
-
-    out->x00 = cosf(theta);
-    out->x01 = -sinf(theta);
-    out->x10 = sinf(theta);
-    out->x11 = cosf(theta);
+    //float theta = RAD(r);
+    float theta = r*(1.0f/90.0f);
+    out->x00 = rau_cosf(theta);
+    out->x01 = -rau_sinf(theta);
+    out->x10 = rau_sinf(theta);
+    out->x11 = rau_cosf(theta);
     out->x22 = 1;
     out->x33 = 1;
 }
@@ -362,8 +365,9 @@ void Matrix4_scale(float sx, float sy, float sz, struct Matrix4 *out) {
 void Matrix4_perspective(float fov, float aspect_ratio, float znear, float zfar, struct Matrix4 *out) {
     Matrix4_zero(out);
 
-    float inv_tan = 1 / tanf(RAD(fov) * 0.5);
-    
+    //float inv_tan = 1 / rau_tanf(RAD(fov) * 0.5);
+    float inv_tan = 1 / rau_tanf((1/90.0f)*(fov) * 0.5);
+
     out->x00 = inv_tan;
     out->x11 = aspect_ratio * inv_tan;
     out->x22 = zfar / (zfar - znear);
@@ -371,7 +375,7 @@ void Matrix4_perspective(float fov, float aspect_ratio, float znear, float zfar,
     out->x32 = 1;
 }
 
-inline void Matrix4_look_at(struct Vector3 eye, struct Vector3 target, struct Vector3 up, struct Matrix4 *out) {
+void Matrix4_look_at(struct Vector3 eye, struct Vector3 target, struct Vector3 up, struct Matrix4 *out) {
     struct Vector3 forward = Vector3_normalize(Vector3_sub(target, eye));
     struct Vector3 right   = Vector3_cross(up, forward); // Assuming up is unit length.
     struct Vector3 new_up  = Vector3_cross(forward, right);
@@ -399,7 +403,7 @@ inline void Matrix4_look_at(struct Vector3 eye, struct Vector3 target, struct Ve
     out->x33 = 1;
 }
 
-inline void Matrix4_viewport(int window_width, int window_height, struct Matrix4 *out) {
+void Matrix4_viewport(int window_width, int window_height, struct Matrix4 *out) {
     struct Matrix4 translate;
     Matrix4_translate(1, 1, 0, &translate);
     struct Matrix4 scale;
@@ -408,8 +412,8 @@ inline void Matrix4_viewport(int window_width, int window_height, struct Matrix4
     Matrix4_mul(&scale, &translate, out);
 }
 
-inline void Matrix4_print(const struct Matrix4 *a) {
-    printf("[%f %f %f %f\n %f %f %f %f\n %f %f %f %f\n %f %f %f %f]", 
+void Matrix4_print(const struct Matrix4 *a) {
+    SDL_Log("[%f %f %f %f\n %f %f %f %f\n %f %f %f %f\n %f %f %f %f]",
         a->x00, a->x01, a->x02, a->x03,
         a->x10, a->x11, a->x12, a->x13,
         a->x20, a->x21, a->x22, a->x23,

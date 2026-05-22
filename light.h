@@ -13,6 +13,6 @@ struct LightSource {
     struct Vector3 pos;
 };
 
-inline float LightSource_get_intensity(struct LightSource s, struct Vector3 p);
+float LightSource_get_intensity(struct LightSource s, struct Vector3 p);
 
 #endif
