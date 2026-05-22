@@ -7,6 +7,7 @@
 static const float C1=0.78539732f, C2=0.64607089f, C3=0.63401085f;
 static const float C4=0.68518412f, C5=0.32482231f, C6=1.52006419f;
 
+// approximates sin(θ)/(sin(θ)+cos(θ)) for diagonal to arc length stretching
 static float rwarp(float t) {
     float v  = t - 0.5f;
     float v2 = v * v;
@@ -73,6 +74,8 @@ float rau_tanf(float x) {
     // this version — acceptable for games/graphics where
     // a missed spike is better than a NaN if user knows it's determined?
     return (SDL_fabsf(c) < 1e-6f) ? 0.0f : s / c;
+    // if sign and asymptotic behavior is desired:
+    //return s / (SDL_fabsf(c) < 1e-6f ? SDL_copysignf(1e-6f, c) : c);
 }
 
 /* LICENSE
