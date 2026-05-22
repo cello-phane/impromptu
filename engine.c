@@ -305,16 +305,16 @@ void Engine_run(struct Engine *e) {
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
 
-    // Automatic rotation after R is pressed
-	if (r_pressed) {
-	    rotating = 1;
-            Model_rotate(model, 0, dt * 0.01, 0);
-	}
-	else {
-	    rotating = 0;
-	}
+        // Automatic rotation after R is pressed
+    	if (r_pressed) {
+    	    rotating = 1;
+                Model_rotate(model, 0, dt * 0.01, 0);
+    	}
+    	else {
+    	    rotating = 0;
+    	}
 
-	// Recompute view matrix.
+    	// Recompute view matrix.
         Matrix4_look_at(
             camera_pos,
             Vector3_add(camera_pos, look_forward),

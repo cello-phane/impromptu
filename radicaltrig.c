@@ -65,12 +65,14 @@ float rau_sinf(float x) {
 }
 
 float rau_cosf(float x) {
-    float s, c; rau_sincos(x, &s, &c);
+    float s, c;
+    rau_sincos(x, &s, &c);
     return c;
 }
 
 float rau_tanf(float x) {
-    float s, c; rau_sincos(x, &s, &c);
+    float s, c;
+    rau_sincos(x, &s, &c);
     // this version — acceptable for games/graphics where
     // a missed spike is better than a NaN if user knows it's determined?
     return (SDL_fabsf(c) < 1e-6f) ? 0.0f : s / c;
