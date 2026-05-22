@@ -1,8 +1,8 @@
 #ifndef RADICALTRIG_H
 #define RADICALTRIG_H
 
-#include <stdint.h>
 #include <SDL.h>
+//#include <stdint.h>
 //#include <string.h> // memcpy for bitcast
 //#include <math.h> //for sqrt (or include SDL.h for SDL_sqrtf)
 
