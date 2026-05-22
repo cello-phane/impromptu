@@ -38,8 +38,8 @@ void rau_sincos(float in_rad, float *sin_out, float *cos_out) {
     float omw = 1.0f - w;
     float D   = omw*omw + w*w;    // = 1 - 2w(1-w)
     float inv = 1.0f / SDL_sqrtf(D);  // Trig formulae:
-    float cs  = omw * inv;        // (1-w) ÷ sqrt(1 + 2×w + 2×w^2)
-    float sn  = w   * inv;        //  w ÷ sqrt(1 + 2×w + 2×w^2)
+    float cs  = omw * inv;        // (1-w) ÷ sqrt(1 + 2w + 2w^2)
+    float sn  = w   * inv;        //     w ÷ sqrt(1 + 2w + 2w^2)
 
     // sign bits from quadrant
     // cos negative in Q1,Q2 (qi=1,2): csign bit set when (qi+1)>>1 & 1
