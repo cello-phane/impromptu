@@ -1,4 +1,5 @@
 #include "radicaltrig.h"
+#include "SDL_stdinc.h"
 
 // Graph of sin/cos/tan and inverse functions - https://www.desmos.com/calculator/gkellct2v2
 
@@ -107,7 +108,7 @@ float rau_tanf(float x) {
     SDL_memcpy(&cs, &cs_bits, 4);
     SDL_memcpy(&sn, &sn_bits, 4);
     // work with only numerator of sin/cos
-    return sn / cs;
+    return x < 0.0f ? SDL_copysignf(sn / cs, x) : sn / cs;
 }
 
 /* LICENSE
