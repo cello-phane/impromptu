@@ -16,13 +16,14 @@ static float rwarp(float t) {
 }
 
 // Radical Angle Unit - sincos, accurate to ~ 5 Digits
-void rau_sincos(float in_rad, float *sin_out, float *cos_out) {
-    // range reduction: fold into [0,1) RAU turns
+void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     // radian to radical conversion - radian*2/π because 1 RAU == π/2
-    //float rau = in_rad * (2.0f / 3.14159265358979323846f);
-    float rau = in_rad; // input can be a radical angle unit if desired
+    // input_t = input_t * (2.0f / 3.14159265358979323846f); // 0 to π/2 expected input
+
+    /* --- Range reduction: fold into [0,1) RAU turns --- */
+
     // shift to positive before floor
-    float rau_pos = rau + 4096.0f;        // bias to ensure positive
+    float rau_pos = input_t + 4096.0f;        // bias to ensure positive
     // Since 4096 = 2¹² and 4096 & 3 = 0, adding it shifts the integer
     // but leaves qi = qi_full & 3 unchanged relative to what it would be without the bias
     int   quadrant_index_full = (int)rau_pos;  // integral is an index to map result
@@ -70,7 +71,7 @@ float rau_cosf(float x) {
     return c;
 }
 
-float rau_tanf(float x) {
+/*float rau_tanf(float x) {
     float s, c;
     rau_sincos(x, &s, &c);
     // this version — acceptable for games/graphics where
@@ -78,6 +79,35 @@ float rau_tanf(float x) {
     return (SDL_fabsf(c) < 1e-6f) ? 0.0f : s / c;
     // if sign and asymptotic behavior is desired:
     //return s / (SDL_fabsf(c) < 1e-6f ? SDL_copysignf(1e-6f, c) : c);
+}*/
+
+float rau_tanf(float x) {
+    //x = x * (2.0f / 3.14159265358979323846f);
+    float rau_pos = x + 4096.0f;
+    int   quadrant_index_full = (int)rau_pos;
+    float frac = rau_pos - (float)quadrant_index_full;
+    int   quadrant_index = quadrant_index_full & 3;
+
+    float w = rwarp(frac);
+
+    if (quadrant_index & 1) w = 1.0f - w;
+
+    float omw = 1.0f - w;
+    float cs  = omw;
+    float sn  = w;
+
+    uint32_t csign = (uint32_t)(((quadrant_index+1)>>1) & 1) << 31;
+    uint32_t ssign = (uint32_t)( (quadrant_index>>1)    & 1) << 31;
+
+    uint32_t cs_bits, sn_bits;
+    SDL_memcpy(&cs_bits, &cs, 4);
+    SDL_memcpy(&sn_bits, &sn, 4);
+    cs_bits ^= csign;
+    sn_bits ^= ssign;
+    SDL_memcpy(&cs, &cs_bits, 4);
+    SDL_memcpy(&sn, &sn_bits, 4);
+    // work with only numerator of sin/cos
+    return sn / (SDL_fabsf(cs) < 1e-6f ? SDL_copysignf(1e-6f, sn) : cs);
 }
 
 /* LICENSE
