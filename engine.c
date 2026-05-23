@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "model.h"
 #include "radicaltrig.h"
 
 struct Engine *Engine_create(int window_width, int window_height) {
@@ -163,10 +164,10 @@ void Engine_run(struct Engine *e) {
         0, 0, 0,
         1, 1, 1
     );
+
     Model_rotate(model, 180, 0, 0); //Shiba.obj is upside down without this rotation.
     //struct Model *model = Model_unit_cube();
     SDL_Log("Triangle count = %d", model->num_tris);
-
     // Lights.
     struct LightSource point_light;
     point_light.type  = LIGHT_TYPE_POINT;
@@ -175,7 +176,7 @@ void Engine_run(struct Engine *e) {
 
     // Transformations.
     struct Matrix4 projection;
-    Matrix4_perspective(90, e->aspect_ratio, 0.1, 10, &projection);
+    Matrix4_perspective(30, e->aspect_ratio, 0.1, 0, &projection);
 
     struct Matrix4 view;
     struct Vector3 camera_pos = Vector3_create_point(0, 0, 0);
@@ -217,6 +218,7 @@ void Engine_run(struct Engine *e) {
     int running = 1;
     SDL_Event event;
     camera_pos.z -= 1.5; // Start camera viewing outside of obj
+    camera_pos.y -= 0.2;
     while (running) {
         frame_start = frame_end;
         frame_end   = SDL_GetPerformanceCounter();
@@ -306,16 +308,16 @@ void Engine_run(struct Engine *e) {
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
 
-    // Automatic rotation after R is pressed
-	if (r_pressed) {
-	    rotating = 1;
-            Model_rotate(model, 0, dt * 0.01, 0);
-	}
-	else {
-	    rotating = 0;
-	}
+        // Automatic rotation after R is pressed
+    	if (r_pressed) {
+    	    rotating = 1;
+                Model_rotate(model, 0, dt * 0.01, 0);
+    	}
+    	else {
+    	    rotating = 0;
+    	}
 
-	// Recompute view matrix.
+    	// Recompute view matrix.
         Matrix4_look_at(
             camera_pos,
             Vector3_add(camera_pos, look_forward),
