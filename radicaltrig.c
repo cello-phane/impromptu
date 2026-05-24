@@ -18,8 +18,8 @@ static float rwarp(float t) {
 
 // Radical Angle Unit - sincos, accurate to ~ 5 Digits
 void rau_sincos(float input_t, float *sin_out, float *cos_out) {
-    // radian to radical conversion - radian*2/π because 1 RAU == π/2
-    // input_t = input_t * (2.0f / 3.14159265358979323846f); // 0 to π/2 expected input
+    // if radian is input type input_t = input_t * (2/π), otherwise comment out
+    // input_t = input_t * (2.0f / M_PI);
 
     /* --- Range reduction: fold into [0,1) RAU turns --- */
 
@@ -85,13 +85,12 @@ float rau_tanf(float x) {
     float frac = rau_pos - (float)quadrant_index_full;
     int   quadrant_index = quadrant_index_full & 3;
 
-    float w = rwarp(frac);
+    // work with only numerator of sin & cos
+    float sn = rwarp(frac);
 
-    if (quadrant_index & 1) w = 1.0f - w;
+    if (quadrant_index & 1) sn = 1.0f - sn;
 
-    float omw = 1.0f - w;
-    float cs  = omw;
-    float sn  = w;
+    float cs = 1.0f - sn;
 
     uint32_t csign = (uint32_t)(((quadrant_index+1)>>1) & 1) << 31;
     uint32_t ssign = (uint32_t)( (quadrant_index>>1)    & 1) << 31;
@@ -103,8 +102,9 @@ float rau_tanf(float x) {
     sn_bits ^= ssign;
     SDL_memcpy(&cs, &cs_bits, 4);
     SDL_memcpy(&sn, &sn_bits, 4);
-    // work with only numerator of sin/cos
-    return sn / (SDL_fabsf(cs) < 1e-6f ? SDL_copysignf(1e-6f, cs) : cs);
+    // cs is always positive from warp, so only the sign bit was modified
+    // fabsf(cs) == cs always
+    return sn / (cs < 1e-6f ? SDL_copysignf(1e-6f, cs) : cs);
 }
 
 /* LICENSE
