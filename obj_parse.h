@@ -2,7 +2,6 @@
 #define OBJ_PARSE
 
 #include "vector3.h"
-#include "model.h"
 
 // Some useful size constants.
 #define MAX_LL  512  // Max string length of a line in OBJ and MTL files.

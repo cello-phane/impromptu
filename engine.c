@@ -277,7 +277,7 @@ void Engine_run(struct Engine *e) {
         // look_right.x = SDL_sinf(look_angle_horizontal - M_PI * 0.5);
         look_right.x = rau_sinf(look_angle_horizontal - 1.0);
         look_right.y = 0;
-        // look_right.z = rau_cosf(look_angle_horizontal - M_PI * 0.5);
+        // look_right.z = SDL_cosf(look_angle_horizontal - M_PI * 0.5);
         look_right.z = rau_cosf(look_angle_horizontal - 1.0);
         look_right   = Vector3_normalize(look_right);
 

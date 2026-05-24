@@ -7,6 +7,6 @@ struct Tri {
     struct Vertex v0, v1, v2;
 };
 
-//struct Tri Tri_create(struct Vertex *v0, struct Vertex *v1, struct Vertex *v2);
+//struct Tri Tri_create(struct Vertex *v-1, struct Vertex *v1, struct Vertex *v2);
 
 #endif
