@@ -108,7 +108,7 @@ float rau_tanf(float x) {
     SDL_memcpy(&cs, &cs_bits, 4);
     SDL_memcpy(&sn, &sn_bits, 4);
     // work with only numerator of sin/cos
-    return x < 0.0f ? SDL_copysignf(sn / cs, x) : sn / cs;
+    return sn / (SDL_fabsf(cs) < 1e-6f ? SDL_copysignf(1e-6f, cs) : cs);
 }
 
 /* LICENSE

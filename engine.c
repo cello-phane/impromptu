@@ -48,13 +48,11 @@ struct Engine *Engine_create(int window_width, int window_height) {
     }
 
     // Controls.
-    //e->move_speed = 0.005;
-    e->move_speed = 0.0015;
-    //e->look_speed = 0.0001;
-    e->look_speed = 0.00005;
+    e->move_speed = 0.005;
+    e->look_speed = 0.0001;
 
     // Render options.
-    e->wireframe           = 1;
+    e->wireframe           = 0;
     e->backface_culling    = 0;
     e->show_vertex_normals = 0;
 
@@ -158,20 +156,19 @@ void Engine_run(struct Engine *e) {
 
     // Models.
     struct Model *model = Model_from_obj(
-        "models/Shiba.obj",
+        "models/casa.obj",
         0, 0, 1,
         0, 0, 0,
         1, 1, 1
     );
-    Model_rotate(model, 180, 0, 0); //Shiba.obj is upside down without this rotation.
     //struct Model *model = Model_unit_cube();
     SDL_Log("Triangle count = %d", model->num_tris);
 
     // Lights.
-    struct LightSource point_light;
-    point_light.type  = LIGHT_TYPE_POINT;
-    point_light.power = 100;
-    float tmp_light_rotation_angle = 0;
+    // struct LightSource point_light;
+    // point_light.type  = LIGHT_TYPE_POINT;
+    // point_light.power = 100;
+    // float tmp_light_rotation_angle = 0;
 
     // Transformations.
     struct Matrix4 projection;
@@ -204,6 +201,7 @@ void Engine_run(struct Engine *e) {
     int lshift_pressed = 0;
     int space_pressed  = 0;
     int rotating       = 0;
+
     struct Vector3 move_direction = Vector3_create_direction(0, 0, 0);
 
     int mouse_x, mouse_y;
@@ -216,7 +214,7 @@ void Engine_run(struct Engine *e) {
 
     int running = 1;
     SDL_Event event;
-    camera_pos.z -= 1.5; // Start camera viewing outside of obj
+
     while (running) {
         frame_start = frame_end;
         frame_end   = SDL_GetPerformanceCounter();
@@ -261,7 +259,7 @@ void Engine_run(struct Engine *e) {
         look_angle_vertical   -= e->look_speed * dt * (e->half_window_height - mouse_y);
 
         // Clamp vertical to [-pi / 2, pi / 2].
-        //look_angle_vertical = MAX(-M_PI * 0.5, MIN(M_PI * 0.5, look_angle_vertical));
+        // look_angle_vertical = MAX(-M_PI * 0.5, MIN(M_PI * 0.5, look_angle_vertical));
         look_angle_vertical = MAX(-1.0, MIN(1.0, look_angle_vertical));
 
         look_forward.x = rau_cosf(look_angle_vertical) * rau_sinf(look_angle_horizontal);
@@ -269,10 +267,10 @@ void Engine_run(struct Engine *e) {
         look_forward.z = rau_cosf(look_angle_vertical) * rau_cosf(look_angle_horizontal);
         look_forward   = Vector3_normalize(look_forward);
 
-        //look_right.x = rau_sinf(look_angle_horizontal - M_PI * 0.5);
+        // look_right.x = SDL_sinf(look_angle_horizontal - M_PI * 0.5);
         look_right.x = rau_sinf(look_angle_horizontal - 1.0);
         look_right.y = 0;
-        //look_right.z = rau_cosf(look_angle_horizontal - M_PI * 0.5);
+        // look_right.z = rau_cosf(look_angle_horizontal - M_PI * 0.5);
         look_right.z = rau_cosf(look_angle_horizontal - 1.0);
         look_right   = Vector3_normalize(look_right);
 
@@ -306,16 +304,26 @@ void Engine_run(struct Engine *e) {
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
 
-    // Automatic rotation after R is pressed
-	if (r_pressed) {
-	    rotating = 1;
-            Model_rotate(model, 0, dt * 0.01, 0);
-	}
-	else {
-	    rotating = 0;
-	}
+        // Automatic rotation after R is pressed
+    	if (r_pressed) {
+    	    rotating = 1;
+                        Model_rotate(model, 0, dt * 0.01, 0);
+    	}
+    	else {
+    	    rotating = 0;
+    	}
 
-	// Recompute view matrix.
+    	// Recompute view matrix.
+                Matrix4_look_at(
+                    camera_pos,
+                    Vector3_add(camera_pos, look_forward),
+                    look_up,
+                    &view
+                );
+
+        //Model_rotate(model, 0, dt * 0.01, 0);
+
+        // Recompute view matrix.
         Matrix4_look_at(
             camera_pos,
             Vector3_add(camera_pos, look_forward),
@@ -385,6 +393,7 @@ void Engine_run(struct Engine *e) {
             struct Vector3 vn0 = Vector3_add(v0, n0);
             struct Vector3 vn1 = Vector3_add(v1, n1);
             struct Vector3 vn2 = Vector3_add(v2, n2);
+
 
             // View.
             v0 = Matrix4_vmul(&view, v0);
@@ -502,9 +511,9 @@ void Engine_run(struct Engine *e) {
             float z3 = v2.z;
 
             // Transform unit normals (components in range [-1, 1]) to be suitable for colouring (components in range [0, 1]).
-            n0 = Vector3_add(Vector3_smul(Vector3_normalize(n0), 0.5), (struct Vector3) { 0.5, 0.5, 0.5 });
-            n1 = Vector3_add(Vector3_smul(Vector3_normalize(n1), 0.5), (struct Vector3) { 0.5, 0.5, 0.5 });
-            n2 = Vector3_add(Vector3_smul(Vector3_normalize(n2), 0.5), (struct Vector3) { 0.5, 0.5, 0.5 });
+            n0 = Vector3_add(Vector3_smul(Vector3_normalize(n0), 0.5), (struct Vector3){0.5, 0.5, 0.5});
+            n1 = Vector3_add(Vector3_smul(Vector3_normalize(n1), 0.5), (struct Vector3){0.5, 0.5, 0.5});
+            n2 = Vector3_add(Vector3_smul(Vector3_normalize(n2), 0.5), (struct Vector3){0.5, 0.5, 0.5});
 
             // Finding bounding box of triangle (also considering the bounds of the screen).
             float bb_min_x = MAX(MIN(MIN(x1, x2), x3), 0);
@@ -577,7 +586,7 @@ void Engine_run(struct Engine *e) {
         }
 
         // Copy pixels to texture.
-        SDL_UpdateTexture(e->frame_texture, NULL, e->color_buffer, e->window_width * 4);
+        //SDL_UpdateTexture(e->frame_texture, NULL, e->color_buffer, e->window_width * 4);
         unsigned char *locked_pixels;
         int pitch; // Dummy.
         SDL_LockTexture(e->frame_texture, NULL, (void**)&locked_pixels, &pitch);
