@@ -53,8 +53,8 @@ struct Engine *Engine_create(int window_width, int window_height) {
     e->look_speed = 0.0001;
 
     // Render options.
-    e->wireframe           = 0;
-    e->backface_culling    = 0;
+    e->wireframe           = 1;
+    e->backface_culling    = 1;
     e->show_vertex_normals = 0;
 
     return e;
@@ -155,13 +155,17 @@ float _edge(float x1, float y1, float x2, float y2, float x3, float y3) {
 void Engine_run(struct Engine *e) {
     SDL_Log("Engine_run: running engine.");
 
+    int render_inverted_y = 1; //in the case of a model like Shiba.obj
     // Models.
     struct Model *model = Model_from_obj(
-        "models/Shiba.obj",
+        // "models/Shiba.obj",
+        "models/Intergalactic_Spaceships_Version_2.obj",
         0, 0, 1,
         0, 0, 0,
         1, 1, 1
     );
+
+    if (render_inverted_y) Model_rotate(model,180,0,0);
     //struct Model *model = Model_unit_cube();
     SDL_Log("Triangle count = %d", model->num_tris);
 
@@ -216,7 +220,6 @@ void Engine_run(struct Engine *e) {
     int running = 1;
     SDL_Event event;
 
-    Model_rotate(model,180,0,0);
     while (running) {
         frame_start = frame_end;
         frame_end   = SDL_GetPerformanceCounter();
@@ -256,9 +259,11 @@ void Engine_run(struct Engine *e) {
         // Mouse.
         SDL_GetMouseState(&mouse_x, &mouse_y);
         SDL_WarpMouseInWindow(e->window, e->half_window_width, e->half_window_height);
+        // mouse sensitivity (setting manually, temporarily)
+        float dt_looking = dt*0.45;
 
-        look_angle_horizontal -= e->look_speed * dt * (e->half_window_width  - mouse_x);
-        look_angle_vertical   -= e->look_speed * dt * (e->half_window_height - mouse_y);
+        look_angle_horizontal -= e->look_speed * dt_looking * (e->half_window_width  - mouse_x);
+        look_angle_vertical   -= e->look_speed * dt_looking * (e->half_window_height - mouse_y);
 
         // Clamp vertical to [-pi / 2, pi / 2].
         // look_angle_vertical = MAX(-M_PI * 0.5, MIN(M_PI * 0.5, look_angle_vertical));
@@ -280,36 +285,36 @@ void Engine_run(struct Engine *e) {
 
         // Keyboard.
         if (w_pressed) {
-            move_direction = Vector3_smul(look_forward, dt * e->move_speed);
+            move_direction = Vector3_smul(look_forward, dt_looking * e->move_speed);
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
         if (s_pressed) {
-            move_direction = Vector3_smul(look_forward, dt * -e->move_speed);
+            move_direction = Vector3_smul(look_forward, dt_looking * -e->move_speed);
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
         if (a_pressed) {
-            move_direction = Vector3_smul(look_right, dt * e->move_speed);
+            move_direction = Vector3_smul(look_right, dt_looking * e->move_speed);
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
         if (d_pressed) {
-            move_direction = Vector3_smul(look_right, dt * -e->move_speed);
+            move_direction = Vector3_smul(look_right, dt_looking * -e->move_speed);
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
         if (lshift_pressed) {
             //move_direction = Vector3_smul(Vector3_create_direction(0, 1, 0), dt * e->move_speed);
-            move_direction = Vector3_smul(Vector3_create_direction(0, 1, 0), dt*0.5 * e->move_speed);
+            move_direction = Vector3_smul(Vector3_create_direction(0, 1, 0), dt_looking*0.5 * e->move_speed);
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
         if (space_pressed) {
             //move_direction = Vector3_smul(Vector3_create_direction(0, 1, 0), dt * -e->move_speed);
-            move_direction = Vector3_smul(Vector3_create_direction(0, 1, 0), dt*0.5 * -e->move_speed);
+            move_direction = Vector3_smul(Vector3_create_direction(0, 1, 0), dt_looking*0.5 * -e->move_speed);
             camera_pos     = Vector3_add(camera_pos, move_direction);
         }
 
         // Automatic rotation after R is pressed
     	if (r_pressed) {
     	    rotating = 1;
-            Model_rotate(model, 0, 360, 0);
+            if (render_inverted_y) Model_rotate(model, 0, 360, 0);
             Model_rotate(model, 0, dt * 0.01, 0);
     	}
     	else {
