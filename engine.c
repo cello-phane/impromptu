@@ -1,4 +1,5 @@
 #include "engine.h"
+#include "model.h"
 #include "radicaltrig.h"
 
 struct Engine *Engine_create(int window_width, int window_height) {
@@ -156,7 +157,7 @@ void Engine_run(struct Engine *e) {
 
     // Models.
     struct Model *model = Model_from_obj(
-        "models/casa.obj",
+        "models/Shiba.obj",
         0, 0, 1,
         0, 0, 0,
         1, 1, 1
@@ -215,6 +216,7 @@ void Engine_run(struct Engine *e) {
     int running = 1;
     SDL_Event event;
 
+    Model_rotate(model,180,0,0);
     while (running) {
         frame_start = frame_end;
         frame_end   = SDL_GetPerformanceCounter();
@@ -307,19 +309,20 @@ void Engine_run(struct Engine *e) {
         // Automatic rotation after R is pressed
     	if (r_pressed) {
     	    rotating = 1;
-                        Model_rotate(model, 0, dt * 0.01, 0);
+            Model_rotate(model, 0, 360, 0);
+            Model_rotate(model, 0, dt * 0.01, 0);
     	}
     	else {
     	    rotating = 0;
     	}
 
     	// Recompute view matrix.
-                Matrix4_look_at(
-                    camera_pos,
-                    Vector3_add(camera_pos, look_forward),
-                    look_up,
-                    &view
-                );
+        Matrix4_look_at(
+            camera_pos,
+            Vector3_add(camera_pos, look_forward),
+            look_up,
+            &view
+        );
 
         //Model_rotate(model, 0, dt * 0.01, 0);
 
