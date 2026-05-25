@@ -6,9 +6,9 @@
 //#include <string.h> // memcpy for bitcast
 //#include <math.h> //for sqrt (or include SDL.h for SDL_sqrtf)
 
-void rau_sincos(float in_rad, float *sin_out, float *cos_out);
-
-// Convenience wrappers matching SDL signature
+// prototypes
+float mod4(float a);
+void rau_sincos(float input_t, float *sin_out, float *cos_out);
 float rau_sinf(float x);
 float rau_cosf(float x);
 float rau_tanf(float x);

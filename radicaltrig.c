@@ -6,21 +6,23 @@
 // Warp polynomial — maps t∈[0,1] → w∈[0,1], symmetric about 0.5 [~5 digits accuracy]
 static const float C1=0.78539732f, C2=0.64607089f, C3=0.63401085f;
 static const float C4=0.68518412f, C5=0.32482231f, C6=1.52006419f;
-
-// helper that takes in +/- values
-float mod4(float a) {return a - 4*SDL_floor(a/4);} //return in range [0, 4)
-
-
-static float maxf(float a, float b) {
-    return a > b ? a : b;
-}
-
 // approximates sin(θ)/(sin(θ)+cos(θ)) for diagonal to arc length stretching
 static float rwarp(float t) {
     float v  = t - 0.5f;
     float v2 = v * v;
     float p  = C1 + v2*(C2 + v2*(C3 + v2*(C4 + v2*(C5 + v2*C6))));
     return 0.5f + v * p;
+}
+
+// helpers
+float mod4(float a) {
+    float r = SDL_fmodf(a, 4.0f);
+    if (r < 0.0f) r += 4.0f;
+    return r;
+}
+
+static float maxf(float a, float b) {
+    return a > b ? a : b;
 }
 
 static uint32_t float_to_bits(float x)
@@ -39,9 +41,8 @@ static float bits_to_float(uint32_t u)
 
 // Radical Angle Unit - sincos, accurate to ~ 5 Digits
 void rau_sincos(float input_t, float *sin_out, float *cos_out) {
-    // if radian is input type input_t = input_t * (2/π), otherwise comment out
-    // input_t = input_t * (2.0f / M_PI);
-
+    // if radian is input type:
+    // input_t = input_t * (2/π);
     /* --- Range reduction: fold into [0,1) and integer is a quadrant index --- */
     float rau_pos = mod4(input_t);
     int   quadrant_index_full = (int)rau_pos;
@@ -89,6 +90,8 @@ float rau_cosf(float x) {
 
 float rau_tanf(float x)
 {
+    // if radian is input type:
+    // x = x * (2/π);
     float rau_pos = mod4(x);
     int   quadrant_index_full = (int)rau_pos;
     float frac = rau_pos - (float)quadrant_index_full;
