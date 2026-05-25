@@ -23,6 +23,20 @@ static float rwarp(float t) {
     return 0.5f + v * p;
 }
 
+static uint32_t float_to_bits(float x)
+{
+    uint32_t u;
+    SDL_memcpy(&u, &x, sizeof u);
+    return u;
+}
+
+static float bits_to_float(uint32_t u)
+{
+    float x;
+    SDL_memcpy(&x, &u, sizeof x);
+    return x;
+}
+
 // Radical Angle Unit - sincos, accurate to ~ 5 Digits
 void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     // if radian is input type input_t = input_t * (2/π), otherwise comment out
@@ -53,13 +67,11 @@ void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     uint32_t csign = (uint32_t)(((quadrant_index+1)>>1) & 1) << 31;
     uint32_t ssign = (uint32_t)( (quadrant_index>>1)    & 1) << 31;
 
-    uint32_t cs_bits, sn_bits;
-    memcpy(&cs_bits, &cs, 4);
-    memcpy(&sn_bits, &sn, 4);
-    cs_bits ^= csign;
-    sn_bits ^= ssign;
-    memcpy(cos_out, &cs_bits, 4);
-    memcpy(sin_out, &sn_bits, 4);
+    uint32_t cs_bits = float_to_bits(cs) ^ csign;
+    uint32_t sn_bits = float_to_bits(sn) ^ ssign;
+
+    *cos_out = bits_to_float(cs_bits);
+    *sin_out = bits_to_float(sn_bits);
 }
 
 // Convenience wrappers
