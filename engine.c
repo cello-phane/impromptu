@@ -179,7 +179,7 @@ void Engine_run(struct Engine *e) {
 
     // Transformations.
     struct Matrix4 projection;
-    Matrix4_perspective(90, e->aspect_ratio, 0.1, 25, &projection);
+    Matrix4_perspective(90, e->aspect_ratio, 0.1, 22, &projection);
 
     struct Matrix4 view;
     struct Vector3 camera_pos = Vector3_create_point(0, 0, 0);

@@ -302,11 +302,13 @@ void Matrix4_rotate_x(float r, struct Matrix4 *out) {
 
     //float theta = RAD(r);
     float theta = r*(1.0f/90.0f);
+    float c, s;
+    rau_sincos(theta, &s, &c);
     out->x00 = 1;
-    out->x11 = rau_cosf(theta);
-    out->x12 = -rau_sinf(theta);
-    out->x21 = rau_sinf(theta);
-    out->x22 = rau_cosf(theta);
+    out->x11 = c;
+    out->x12 = -s;
+    out->x21 = s;
+    out->x22 = c;
     out->x33 = 1;
 }
 
@@ -315,11 +317,13 @@ void Matrix4_rotate_y(float r, struct Matrix4 *out) {
 
     //float theta = RAD(r);
     float theta = r*(1.0f/90.0f);
-    out->x00 = rau_cosf(theta);
-    out->x02 = rau_sinf(theta);
+    float c, s;
+    rau_sincos(theta, &s, &c);
+    out->x00 = c;
+    out->x02 = s;
     out->x11 = 1;
-    out->x20 = -rau_sinf(theta);
-    out->x22 = rau_cosf(theta);
+    out->x20 = -s;
+    out->x22 = c;
     out->x33 = 1;
 }
 
@@ -328,10 +332,12 @@ void Matrix4_rotate_z(float r, struct Matrix4 *out) {
 
     //float theta = RAD(r);
     float theta = r*(1.0f/90.0f);
-    out->x00 = rau_cosf(theta);
-    out->x01 = -rau_sinf(theta);
-    out->x10 = rau_sinf(theta);
-    out->x11 = rau_cosf(theta);
+    float c, s;
+    rau_sincos(theta, &s, &c);
+    out->x00 = c;
+    out->x01 = -s;
+    out->x10 = s;
+    out->x11 = c;
     out->x22 = 1;
     out->x33 = 1;
 }
