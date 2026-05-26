@@ -49,8 +49,8 @@ struct Engine *Engine_create(int window_width, int window_height) {
     }
 
     // Controls.
-    e->move_speed = 0.00175;
-    e->look_speed = 0.00007;
+    e->move_speed = 0.0075;
+    e->look_speed = 0.000075;
 
     // Render options.
     e->wireframe           = 1;
@@ -155,12 +155,12 @@ float _edge(float x1, float y1, float x2, float y2, float x3, float y3) {
 void Engine_run(struct Engine *e) {
     SDL_Log("Engine_run: running engine.");
 
-    int render_inverted_y = 0; //in the case of a model like Shiba.obj
+    int render_inverted_y = 1; //in the case of a model like Shiba.obj
     // Models.
     struct Model *model = Model_from_obj(
         // "models/Shiba.obj",
-        // "models/Intergalactic_Spaceships_Version_2.obj",
-        "models/sphere.obj",
+        "models/Intergalactic_Spaceships_Version_2.obj",
+        // "models/sphere.obj",
         // "models/benz.obj",
         0, 0, 1,
         0, 0, 0,
@@ -179,7 +179,7 @@ void Engine_run(struct Engine *e) {
 
     // Transformations.
     struct Matrix4 projection;
-    Matrix4_perspective(90, e->aspect_ratio, 0.1, 10, &projection);
+    Matrix4_perspective(90, e->aspect_ratio, 0.1, 25, &projection);
 
     struct Matrix4 view;
     struct Vector3 camera_pos = Vector3_create_point(0, 0, 0);
@@ -262,7 +262,7 @@ void Engine_run(struct Engine *e) {
         SDL_GetMouseState(&mouse_x, &mouse_y);
         SDL_WarpMouseInWindow(e->window, e->half_window_width, e->half_window_height);
         // mouse sensitivity (setting manually, temporarily)
-        float dt_looking = dt*0.45;
+        float dt_looking = dt;
 
         look_angle_horizontal -= e->look_speed * dt_looking * (e->half_window_width  - mouse_x);
         look_angle_vertical   -= e->look_speed * dt_looking * (e->half_window_height - mouse_y);
@@ -317,7 +317,7 @@ void Engine_run(struct Engine *e) {
     	if (r_pressed) {
     	    rotating = 1;
             if (render_inverted_y) Model_rotate(model, 0, 360, 0);
-            Model_rotate(model, 0, dt * 0.1, 0);
+            Model_rotate(model, 0, dt * 0.05, 0);
     	}
     	else {
     	    rotating = 0;
