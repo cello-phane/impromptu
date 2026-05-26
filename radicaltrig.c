@@ -1,14 +1,21 @@
 #include "radicaltrig.h"
 #include "SDL_stdinc.h"
 // Graph of sin/cos/tan and inverse functions - https://www.desmos.com/calculator/gkellct2v2
-// Toggle arc-length interpolating/easing to uniform or non-uniform velocity
-// if set to 1 the easing is smoothing up and down along every 45 deg (diagonal see-saw)
-// setting to 1 will skip the rwarp and make the function obviously faster to run
+
+// NON_UNIFORM_VEL 0 — arc-uniform: warp polynomial applied,
+//                     constant arc speed (π/2 per unit parameter)
+//                     correct for FFT twiddles, motor control, camera pans
+//
+// NON_UNIFORM_VEL 1 — raw linear diagonal projection, no warp,
+//                     faster (one fewer polynomial evaluation + sqrt),
+//                     non-uniform arc speed (peaks 2× at 45°),
+//                     acceptable for rendering, easing, visual effects
 #define NON_UNIFORM_VEL 0
+
 // Warp polynomial — maps t∈[0,1] → w∈[0,1], symmetric about 0.5 [~5 digits accuracy]
 static const float C1=0.78539732f, C2=0.64607089f, C3=0.63401085f;
 static const float C4=0.68518412f, C5=0.32482231f, C6=1.52006419f;
-// approximates sin(θ)/(sin(θ)+cos(θ)) for diagonal to arc length stretching
+// Approximates sin(θ)/(sin(θ)+cos(θ)) for diagonal to arc length stretching
 static float rwarp(float t) {
     float v  = t - 0.5f;
     float v2 = v * v;
@@ -16,7 +23,7 @@ static float rwarp(float t) {
     return 0.5f + v * p;
 }
 
-// helpers
+// Helpers
 static float mod4(float a) {
     float r = SDL_fmodf(a, 4.0f);
     if (r < 0.0f) r += 4.0f;
@@ -47,14 +54,14 @@ void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     float frac = rau_pos - (float)quadrant_index_full;
     int   quadrant_index = quadrant_index_full & 3; // quadrant 0 to 3
 
-    // warp into w making linear --> arc length
+    // Warp into w making linear --> arc length
     #if NON_UNIFORM_VEL
     float w = frac;
     #else
     float w = rwarp(frac);
     #endif
 
-    // odd-quadrant reversal: Q1,Q3 → w = 1-w
+    // Odd-quadrant reversal: Q1,Q3 → w = 1-w
     if (quadrant_index & 1) w = 1.0f - w;
 
     // Diagonal to unit circle
@@ -64,7 +71,7 @@ void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     float cs  = omw * inv;        // (1-w) ÷ sqrt(1 - 2w + 2w^2)
     float sn  = w   * inv;        //     w ÷ sqrt(1 - 2w + 2w^2)
 
-    // sign bits from quadrant
+    // Sign bits from quadrant:
     // cos negative in Q1,Q2 (qi=1,2): csign bit set when (qi+1)>>1 & 1
     // sin negative in Q2,Q3 (qi=2,3): ssign bit set when  qi>>1    & 1
     unsigned int csign = (unsigned int)(((quadrant_index+1)>>1) & 1) << 31;
@@ -90,6 +97,7 @@ float rau_cosf(float x) {
     return c;
 }
 
+// Standalone function
 float rau_tanf(float x)
 {
     // if radian is input type and NON_UNIFORM_VEL is 0:
