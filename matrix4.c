@@ -352,10 +352,10 @@ void Matrix4_rotate_xyz(float rx, float ry, float rz, struct Matrix4 *out) {
     Matrix4_rotate_z(rz, &rotate_z);
 
     struct Matrix4 rotate_xy;
-    Matrix4_mul(&rotate_y, &rotate_x, &rotate_xy);
-
-    // Rotate xyz.
-    Matrix4_mul(&rotate_z, &rotate_xy, out);
+    // Extrinsic XYZ: applied as X first, then Y, then Z
+    // Matrix product order is reversed: Z * (Y * X)
+    Matrix4_mul(&rotate_y, &rotate_x, &rotate_xy);  // Y then X
+    Matrix4_mul(&rotate_z, &rotate_xy, out); // Z then YX
 }
 
 
@@ -372,7 +372,10 @@ void Matrix4_perspective(float fov, float aspect_ratio, float znear, float zfar,
     Matrix4_zero(out);
 
     //float inv_tan = 1 / rau_tanf(RAD(fov) * 0.5);
-    float inv_tan = 1 / rau_tanf((1/90.0f)*(fov) * 0.5);
+
+    // NOTE: perspective requires arc-uniform tan — NON_UNIFORM_VEL must be 0 (in radicaltrig.c)
+    // for correct perspective projection
+    float inv_tan = 1.0f / rau_tanf((1.0f/90.0f) * fov * 0.5f);
 
     out->x00 = inv_tan;
     out->x11 = aspect_ratio * inv_tan;
