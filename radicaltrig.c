@@ -30,24 +30,19 @@ static float mod4(float a) {
     return r;
 }
 
-static unsigned int float_to_bits(float x)
-{
-    unsigned int u;
-    SDL_memcpy(&u, &x, sizeof u);
-    return u;
+static Uint32 float_to_bits(float x) {
+    Uint32 u; SDL_memcpy(&u, &x, sizeof u); return u;
 }
 
-static float bits_to_float(unsigned int u)
-{
-    float x;
-    SDL_memcpy(&x, &u, sizeof x);
-    return x;
+static float bits_to_float(Uint32 u) {
+    float x; SDL_memcpy(&x, &u, sizeof x); return x;
 }
 
 // Radical Angle Unit - sincos, accurate to ~ 5 Digits
 void rau_sincos(float input_t, float *sin_out, float *cos_out) {
-    // if radian is input type and NON_UNIFORM_VEL is 0:
-    // input_t = input_t * (2/π);
+    // Input units: RAU (0 to 4 = full revolution)
+    // For radian input: input_t *= (2.0f / M_PI)  before calling
+
     /* --- Range reduction: fold into [0,1) and integer is a quadrant index --- */
     float rau_pos = mod4(input_t);
     int   quadrant_index_full = (int)rau_pos;
@@ -74,11 +69,11 @@ void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     // Sign bits from quadrant:
     // cos negative in Q1,Q2 (qi=1,2): csign bit set when (qi+1)>>1 & 1
     // sin negative in Q2,Q3 (qi=2,3): ssign bit set when  qi>>1    & 1
-    unsigned int csign = (unsigned int)(((quadrant_index+1)>>1) & 1) << 31;
-    unsigned int ssign = (unsigned int)( (quadrant_index>>1)    & 1) << 31;
+    Uint32 csign = (Uint32)(((quadrant_index+1)>>1) & 1) << 31;
+    Uint32 ssign = (Uint32)( (quadrant_index>>1)    & 1) << 31;
 
-    unsigned int cs_bits = float_to_bits(cs) ^ csign;
-    unsigned int sn_bits = float_to_bits(sn) ^ ssign;
+    Uint32 cs_bits = float_to_bits(cs) ^ csign;
+    Uint32 sn_bits = float_to_bits(sn) ^ ssign;
 
     *cos_out = bits_to_float(cs_bits);
     *sin_out = bits_to_float(sn_bits);
@@ -100,8 +95,8 @@ float rau_cosf(float x) {
 // Standalone function
 float rau_tanf(float x)
 {
-    // if radian is input type and NON_UNIFORM_VEL is 0:
-    // x = x * (2/π);
+    // Input units: RAU (0 to 4 = full revolution)
+    // For radian input: x *= (2.0f / M_PI)  before calling
     float rau_pos = mod4(x);
     int   quadrant_index_full = (int)rau_pos;
     float frac = rau_pos - (float)quadrant_index_full;
@@ -126,6 +121,43 @@ float rau_tanf(float x)
         t = -t;
 
     return t;
+}
+
+// Hot path version with M to set velocity
+void rau_sincos_m(float input_t, float M, float *sin_out, float *cos_out) {
+    // M=0: NON_UNIFORM_VEL behaviour (linear diagonal)
+    // M=1: arc-uniform behaviour (warp polynomial)
+    // M in between: smooth interpolation — CVT blend
+    float rau_pos = mod4(input_t);
+    int   qi_full = (int)rau_pos;
+    float frac    = rau_pos - (float)qi_full;
+    int   qi      = qi_full & 3;
+    float w_raw   = frac;
+    float w_warp  = rwarp(frac);
+    float w       = w_raw + M * (w_warp - w_raw);  // lerp
+    if (qi & 1) w = 1.0f - w;
+
+    // Odd-quadrant reversal: Q1,Q3 → w = 1-w
+    if (qi & 1) w = 1.0f - w;
+
+    // Diagonal to unit circle
+    float omw = 1.0f - w;
+    float D   = omw*omw + w*w;    // = 1 - 2w(1-w)
+    float inv = 1.0f / SDL_sqrtf(D);  // Trig formulae:
+    float cs  = omw * inv;        // (1-w) ÷ sqrt(1 - 2w + 2w^2)
+    float sn  = w   * inv;        //     w ÷ sqrt(1 - 2w + 2w^2)
+
+    // Sign bits from quadrant:
+    // cos negative in Q1,Q2 (qi=1,2): csign bit set when (qi+1)>>1 & 1
+    // sin negative in Q2,Q3 (qi=2,3): ssign bit set when  qi>>1    & 1
+    Uint32 csign = (Uint32)(((qi+1)>>1) & 1) << 31;
+    Uint32 ssign = (Uint32)( (qi>>1)    & 1) << 31;
+
+    Uint32 cs_bits = float_to_bits(cs) ^ csign;
+    Uint32 sn_bits = float_to_bits(sn) ^ ssign;
+
+    *cos_out = bits_to_float(cs_bits);
+    *sin_out = bits_to_float(sn_bits);
 }
 
 /* LICENSE
