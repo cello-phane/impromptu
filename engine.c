@@ -49,8 +49,8 @@ struct Engine *Engine_create(int window_width, int window_height) {
     }
 
     // Controls.
-    e->move_speed = 0.005;
-    e->look_speed = 0.0001;
+    e->move_speed = 0.00175;
+    e->look_speed = 0.00007;
 
     // Render options.
     e->wireframe           = 1;
@@ -158,10 +158,10 @@ void Engine_run(struct Engine *e) {
     int render_inverted_y = 0; //in the case of a model like Shiba.obj
     // Models.
     struct Model *model = Model_from_obj(
-        //"models/Shiba.obj",
+        // "models/Shiba.obj",
         // "models/Intergalactic_Spaceships_Version_2.obj",
-        // "models/sphere.obj",
-        "models/benz.obj",
+        "models/sphere.obj",
+        // "models/benz.obj",
         0, 0, 1,
         0, 0, 0,
         1, 1, 1
@@ -317,7 +317,7 @@ void Engine_run(struct Engine *e) {
     	if (r_pressed) {
     	    rotating = 1;
             if (render_inverted_y) Model_rotate(model, 0, 360, 0);
-            Model_rotate(model, 0, dt * 0.01, 0);
+            Model_rotate(model, 0, dt * 0.1, 0);
     	}
     	else {
     	    rotating = 0;
@@ -596,7 +596,7 @@ void Engine_run(struct Engine *e) {
         }
 
         // Copy pixels to texture.
-        //SDL_UpdateTexture(e->frame_texture, NULL, e->color_buffer, e->window_width * 4);
+        SDL_UpdateTexture(e->frame_texture, NULL, e->color_buffer, e->window_width * 4);
         unsigned char *locked_pixels;
         int pitch; // Dummy.
         SDL_LockTexture(e->frame_texture, NULL, (void**)&locked_pixels, &pitch);
