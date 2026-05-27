@@ -12,4 +12,11 @@ float rau_sinf(float x);
 float rau_cosf(float x);
 float rau_tanf(float x);
 
+float rau_arctan_adj(float x);
+float rau_r_arctan(float ry, float rx, int *err);
+float rau_r_arcsin(float s, int *err);
+float rau_r_arccos(float c, int *err);
+float rau_invpoly(float w, int *err);
+float rau_full_phi(float ry, float rx, int *err);
+
 #endif

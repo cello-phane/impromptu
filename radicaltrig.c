@@ -1,5 +1,7 @@
 #include "radicaltrig.h"
 #include "SDL_stdinc.h"
+#include <math.h>
+
 // Graph of sin/cos/tan and inverse functions - https://www.desmos.com/calculator/gkellct2v2
 
 // NON_UNIFORM_VEL 0 — arc-uniform: warp polynomial applied,
@@ -36,6 +38,24 @@ static Uint32 float_to_bits(float x) {
 
 static float bits_to_float(Uint32 u) {
     float x; SDL_memcpy(&x, &u, sizeof x); return x;
+}
+
+static inline int rau_isfinitef(float x) {
+    return isfinite(x);
+}
+
+static inline int rau_in_unit_range(float x) {
+    return x >= -1.0f && x <= 1.0f;
+}
+
+static inline float rau_clampf(float x, float lo, float hi) {
+    return x < lo ? lo : (x > hi ? hi : x);
+}
+
+static inline float rau_sanitize_unit(float x) {
+    if (x < -1.0f) return -1.0f;
+    if (x >  1.0f) return  1.0f;
+    return x;
 }
 
 // Radical Angle Unit - sincos, accurate to ~ 5 Digits
@@ -135,7 +155,6 @@ void rau_sincos_m(float input_t, float M, float *sin_out, float *cos_out) {
     float w_raw   = frac;
     float w_warp  = rwarp(frac);
     float w       = w_raw + M * (w_warp - w_raw);  // lerp
-    if (qi & 1) w = 1.0f - w;
 
     // Odd-quadrant reversal: Q1,Q3 → w = 1-w
     if (qi & 1) w = 1.0f - w;
@@ -158,6 +177,93 @@ void rau_sincos_m(float input_t, float M, float *sin_out, float *cos_out) {
 
     *cos_out = bits_to_float(cs_bits);
     *sin_out = bits_to_float(sn_bits);
+}
+
+float rau_arctan_adj(float x) {
+    float x2 = x * x;
+    return x * (
+        1.000087f
+        + x2 * (-0.33288950512027f
+        + x2 * (0.19383271707398f
+        + x2 * (-0.11735031947869f
+        + x2 * (0.05368137843104f
+        + x2 * (-0.01213232131734f)))))
+    );
+}
+
+float rau_r_arctan(float ry, float rx, int *err) {
+    if (err) *err = 0;
+    if (ry == 0.0f && rx == 0.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    if (rx == 0.0f) return 1.0f;
+    float t = SDL_fabsf(ry / rx);
+    return t / (1.0f + t);
+}
+
+float rau_r_arcsin(float s, int *err) {
+    if (err) *err = 0;
+    if (!rau_isfinitef(s) || s < -1.0f || s > 1.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    float sy2 = s * s;
+    float denom = 2.0f * sy2 - 1.0f;
+    if (SDL_fabsf(denom) < 1e-10f) return 0.5f;
+    float disc = SDL_sqrtf(SDL_max(sy2 * (1.0f - sy2), 0.0f));
+    return SDL_fabsf((sy2 - disc) / denom);
+}
+
+float rau_r_arccos(float c, int *err) {
+    if (err) *err = 0;
+    if (!rau_isfinitef(c) || c < -1.0f || c > 1.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    float cx2 = c * c;
+    float denom = 2.0f * cx2 - 1.0f;
+    if (SDL_fabsf(denom) < 1e-10f) return 0.5f;
+    float disc = SDL_sqrtf(SDL_max(cx2 * (1.0f - cx2), 0.0f));
+    return SDL_fabsf((cx2 - 1.0f + disc) / denom);
+}
+
+float rau_invpoly(float w, int *err) {
+    if (err) *err = 0;
+    if (!rau_isfinitef(w) || w < 0.0f || w > 1.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    static const float AC[6] = {
+        1.000087f, -0.33288950512027f, 0.19383271707398f,
+        -0.11735031947869f, 0.05368137843104f, -0.01213232131734f
+    };
+    if (w >= 0.5f) {
+        float u = (1.0f - w) / w;
+        return (float)(M_PI_2 - (u * (
+            AC[0] + (u*u) * (AC[1] + (u*u) * (AC[2] + (u*u) * (AC[3] + (u*u) * (AC[4] + (u*u) * AC[5]))))
+        ))) * (2.0f / (float)M_PI);
+    } else {
+        float u = w / (1.0f - w);
+        return rau_arctan_adj(u) * (2.0f / (float)M_PI);
+    }
+}
+
+float rau_full_phi(float ry, float rx, int *err) {
+    if (err) *err = 0;
+    if (ry == 0.0f && rx == 0.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    float w = rau_r_arctan(ry, rx, err);
+    if (w==0.0) return NAN;
+    float t = rau_invpoly(w, err);
+    if (t==0.0) return NAN;
+
+    if (rx >= 0.0f && ry >= 0.0f) return 0.0f + t;
+    if (rx <  0.0f && ry >= 0.0f) return 1.0f + (1.0f - t);
+    if (rx <  0.0f && ry <  0.0f) return 2.0f + t;
+    return 3.0f + (1.0f - t);
 }
 
 /* LICENSE
