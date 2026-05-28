@@ -48,6 +48,22 @@ static inline float rau_sanitize_unit(float x) {
     return x;
 }
 
+// ── Convert range of unsigned atan2 result to signed (-pi,+pi] ─────────────
+static inline float rau_atan2_signed_radians(float phi_rau)
+{
+    float wrapped = fmodf(phi_rau + 2.0f, 4.0f);
+    if (wrapped < 0.0f) wrapped += 4.0f;
+    wrapped -= 2.0f;
+    return wrapped * (float)M_PI_2;
+}
+
+static inline float rau_atan2_signed_degs(float phi_rau)
+{
+    float deg = fmodf(phi_rau * 90.0f, 360.0f);
+    if (deg < 0.0f) deg += 360.0f;
+    return deg;
+}
+
 // ── Forward Trigonometric Functions ────────────────────────────────────────
 float rau_warpf(float t) {
     static const float C[6] = {
@@ -259,5 +275,5 @@ float rau_atan2f(float ry, float rx, int *err) {
     if (rx >= 0.0f && ry >= 0.0f) return 0.0f + t;
     if (rx <  0.0f && ry >= 0.0f) return 1.0f + (1.0f - t);
     if (rx <  0.0f && ry <  0.0f) return 2.0f + t;
-    return                                 3.0f + (1.0f - t);
+    return  3.0f + (1.0f - t);
 }
