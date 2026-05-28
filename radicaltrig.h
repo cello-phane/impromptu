@@ -242,27 +242,25 @@ void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out);
  */
 float rau_arctan_adjf(float x);
 
-/* rau_r_arctanf — exact rational inverse.  Returns w ∈ [0,1].
+/* rau_r_arctanf — exact rational reduction of direction to a diagonal ratio.
  *
- * Computes the diagonal ratio:  w = |y/x| / (1 + |y/x|)
+ * Returns w in [0,1], where:
+ *   w = |y/x| / (1 + |y/x|)
  *
- * This is the EXACT inverse within the RAU diagonal parameterisation —
- * not a polynomial approximation.  The only error is floating-point rounding
- * in the division, giving machine epsilon accuracy (~6.73e-16).
+ * This is the reduced direction parameter used by the RAU inverse-angle
+ * pipeline. It does not determine quadrant by itself.
  *
- * The formula is the RAU equivalent of atan:
- *   rau_r_arctanf(sin, cos) = w ∈ [0,1]  (fractional position in current quadrant)
- *   rau_atan2f(sin, cos)    = φ ∈ [0,4)  (full phase including quadrant)
+ * Interpretation:
+ *   w = 0.0  -> x-axis direction within a quadrant
+ *   w = 1.0  -> y-axis direction within a quadrant
+ *   w = 0.5  -> 45° diagonal (warp fixed point)
  *
- * Does NOT recover quadrant information — w is always in [0,1].
- *   w = 0: angle is on the cos-axis  (0° within the quadrant)
- *   w = 1: angle is on the sin-axis  (90° within the quadrant)
- *   w = 0.5: angle is at the 45° diagonal (warp fixed point)
+ * Special cases:
+ *   NaN input           -> err = 1, return NAN
+ *   zero vector (0, 0)  -> err = 1, return NAN
+ *   infinite components  -> normalized to the corresponding boundary value
  *
- * For full angle recovery including quadrant, use rau_atan2f.
- *
- * err = 1: both ry and rx are zero (direction undefined).
- * Max error: 6.73e-16  (machine epsilon — EXACT, not an approximation)
+ * For full angle recovery including quadrant, use rau_atan2f().
  */
 float rau_r_arctanf(float ry, float rx, int *err);
 
@@ -320,36 +318,45 @@ float rau_r_arccosf(float c, int *err);
  */
 float rau_invpolyf(float w, int *err);
 
-/* rau_atan2f — full phase recovery.  Returns φ ∈ [0, 4) RAU.
+/* rau_atan2f — full RAU phase recovery.
  *
- * Equivalent to atan2(y, x) but returns unsigned RAU [0, 4) instead of
- * signed radians (−π, π].
+ * Returns a full-circle phase φ in [0, 4), using the RAU convention:
+ *   0   -> +x axis
+ *   1   -> +y axis
+ *   2   -> -x axis
+ *   3   -> -y axis
  *
- * Range comparison:
- *   atan2(y,x)   → (−π, π]    signed, zero at +x axis, discontinuity at −x axis
- *   rau_atan2f   → [0,  4)    unsigned, wraps continuously — no discontinuity
+ * RAU-space analog of atan2, with an unsigned-turn convention
  *
- * Conversion between conventions:
- *   RAU → signed atan2 radians:  ((phi + 2) mod 4 − 2) · π/2
- *   RAU → atan(y/x) slope only:  the fold formula — see Desmos reference at top
+ * Conversion to signed radians or degrees:
+ *   signed radians = rau_atan2_signed_radians(rau_atan2f(y, x))
+ *   signed degrees = rau_atan2_signed_degrees(rau_atan2f(y, x))
  *
- * The atan(y/x) fold deliberately discards quadrant information to give only
- * the slope angle in (−π/2, π/2).  rau_atan2f preserves it in [0, 4).
- *
- * Pipeline: rau_r_arctanf (EXACT rational) → rau_invpolyf (minimax) → quadrant.
- *   No atan2, no trig, no transcendental functions.
+ * Pipeline:
+ *   1) normalize the input direction
+ *   2) compute reduced ratio with rau_r_arctanf()
+ *   3) invert the diagonal warp with rau_invpolyf()
+ *   4) reconstruct the quadrant
  *
  * Quadrant reconstruction:
- *   Q0 [0°–  90°]:  φ = 0 + t          (t increases forward)
- *   Q1 [90°–180°]:  φ = 1 + (1 − t)    (t increases reversed)
- *   Q2 [180°–270°]: φ = 2 + t          (t increases forward)
- *   Q3 [270°–360°]: φ = 3 + (1 − t)    (t increases reversed)
+ *   Q0 [0°–90°]:    φ = 0 + t
+ *   Q1 [90°–180°]:  φ = 1 + (1 - t)
+ *   Q2 [180°–270°]: φ = 2 + t
+ *   Q3 [270°–360°]: φ = 3 + (1 - t)
  *
- * err = 1: zero vector (ry=0, rx=0), NaN, or non-finite input.
- * Max error: ~1.01e-4  (~13.3 effective bits, ~3 decimal places)
- *   Limited by rau_invpolyf — rau_r_arctanf contributes only machine epsilon.
+ * Special cases:
+ *   NaN input, zero vector -> err = 1, return NAN
+ *   infinite components     -> mapped directly to exact axis/diagonal values
+ *
+ * Accuracy:
+ *   Finite inputs are limited mainly by rau_invpolyf().
+ *   rau_r_arctanf() itself is exact up to floating-point rounding.
  */
 float rau_atan2f(float ry, float rx, int *err);
+
+// Takes result from atan2 and converts to equivalent atan2 ranged result
+float rau_atan2_signed_radians(float phi_rau);
+float rau_atan2_signed_degs(float phi_rau);
 
 #ifdef __cplusplus
 }

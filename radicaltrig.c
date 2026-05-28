@@ -48,6 +48,22 @@ static inline float rau_sanitize_unit(float x) {
     return x;
 }
 
+// ── Convert range of unsigned atan2 result to signed (-pi,+pi] ─────────────
+float rau_atan2_signed_radians(float phi_rau)
+{
+    float wrapped = fmodf(phi_rau + 2.0f, 4.0f);
+    if (wrapped < 0.0f) wrapped += 4.0f;
+    wrapped -= 2.0f;
+    return wrapped * (float)M_PI_2;
+}
+
+float rau_atan2_signed_degs(float phi_rau)
+{
+    float deg = fmodf(phi_rau * 90.0f, 360.0f);
+    if (deg < 0.0f) deg += 360.0f;
+    return deg;
+}
+
 // ── Forward Trigonometric Functions ────────────────────────────────────────
 float rau_warpf(float t) {
     static const float C[6] = {
@@ -171,15 +187,29 @@ float rau_arctan_adjf(float x) {
     );
 }
 
-float rau_r_arctanf(float ry, float rx, int *err) {
+float rau_r_arctanf(float ry, float rx, int *err)
+{
     if (err) *err = 0;
+    if (isnan(rx) || isnan(ry)) {
+        if (err) *err = 1;
+        return NAN;
+    }
     if (ry == 0.0f && rx == 0.0f) {
         if (err) *err = 1;
         return NAN;
     }
-    if (rx == 0.0f) return 1.0f;         /* pure sin-axis: w = 1 */
-    float t = SDL_fabsf(ry / rx);
-    return t / (1.0f + t);               /* w = tan/(1+tan) — exact rational */
+    if (isinf(ry) || isinf(rx)) {
+        if (isinf(ry) && isinf(rx))
+            return 0.5f;
+        if (isinf(ry))
+            return 1.0f;
+        return 0.0f;
+    }
+    if (rx == 0.0f)
+        return 1.0f;
+
+    float t = fabsf(ry / rx);
+    return t / (1.0f + t);
 }
 
 float rau_r_arcsinf(float s, int *err) {
@@ -232,10 +262,10 @@ float rau_invpolyf(float w, int *err) {
     }
 }
 
-float rau_atan2f(float ry, float rx, int *err) {
+float rau_atan2f(float ry, float rx, int *err)
+{
     if (err) *err = 0;
-
-    if (!rau_isfinitef(ry) || !rau_isfinitef(rx)) {
+    if (isnan(rx) || isnan(ry)) {
         if (err) *err = 1;
         return NAN;
     }
@@ -243,21 +273,25 @@ float rau_atan2f(float ry, float rx, int *err) {
         if (err) *err = 1;
         return NAN;
     }
-
+    if (isinf(ry) || isinf(rx)) {
+        if (isinf(ry) && isinf(rx)) {
+            if (ry > 0.0f && rx > 0.0f) return 0.5f;
+            if (ry > 0.0f && rx < 0.0f) return 1.5f;
+            if (ry < 0.0f && rx < 0.0f) return 2.5f;
+            return 3.5f;
+        }
+        if (isinf(ry)) {
+            return (ry > 0.0f) ? 1.0f : 3.0f;
+        }
+        return (rx > 0.0f) ? 0.0f : 2.0f;
+    }
     float w = rau_r_arctanf(ry, rx, err);
     if (err && *err) return NAN;
-
     float t = rau_invpolyf(w, err);
     if (err && *err) return NAN;
 
-    /* Quadrant offset + fractional phase.
-     * Q0 [0°- 90°]: t increases forward   (0 + t)
-     * Q1 [90°-180°]: t increases reversed (1 + (1-t))
-     * Q2 [180°-270°]: t increases forward (2 + t)
-     * Q3 [270°-360°]: t increases reversed (3 + (1-t))
-     */
     if (rx >= 0.0f && ry >= 0.0f) return 0.0f + t;
     if (rx <  0.0f && ry >= 0.0f) return 1.0f + (1.0f - t);
     if (rx <  0.0f && ry <  0.0f) return 2.0f + t;
-    return                                 3.0f + (1.0f - t);
+    return 3.0f + (1.0f - t);
 }
