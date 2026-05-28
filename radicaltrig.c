@@ -2,6 +2,13 @@
 #include "SDL_stdinc.h"
 #include <math.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923
+#endif
+
 // Graph of sin/cos/tan and inverse functions - https://www.desmos.com/calculator/gkellct2v2
 
 // NON_UNIFORM_VEL 0 — arc-uniform: warp polynomial applied,
@@ -13,15 +20,17 @@
 //                     non-uniform arc speed (peaks 2× at 45°),
 //                     acceptable for rendering, easing, visual effects
 #define NON_UNIFORM_VEL 0
-
-// Warp polynomial — maps t∈[0,1] → w∈[0,1], symmetric about 0.5 [~5 digits accuracy]
-static const float C1=0.78539732f, C2=0.64607089f, C3=0.63401085f;
-static const float C4=0.68518412f, C5=0.32482231f, C6=1.52006419f;
+//
 // Approximates sin(θ)/(sin(θ)+cos(θ)) for diagonal to arc length stretching
-static float rwarp(float t) {
-    float v  = t - 0.5f;
+static float rau_warpf(float t) {
+    static const float C[6] = {
+        0.78539732f, 0.64607089f, 0.63401085f,
+        0.68518412f, 0.32482231f, 1.52006419f
+    };
+    float v = t - 0.5f;
     float v2 = v * v;
-    float p  = C1 + v2*(C2 + v2*(C3 + v2*(C4 + v2*(C5 + v2*C6))));
+    float p = C[5];
+    for (int i = 4; i >= 0; --i) p = v2 * p + C[i];
     return 0.5f + v * p;
 }
 
@@ -73,7 +82,7 @@ void rau_sincos(float input_t, float *sin_out, float *cos_out) {
     #if NON_UNIFORM_VEL
     float w = frac;
     #else
-    float w = rwarp(frac);
+    float w = rau_warpf(frac);
     #endif
 
     // Odd-quadrant reversal: Q1,Q3 → w = 1-w
@@ -126,7 +135,7 @@ float rau_tanf(float x)
     #if NON_UNIFORM_VEL
     float w = frac;
     #else
-    float w = rwarp(frac);
+    float w = rau_warpf(frac);
     #endif
 
     if (quadrant_index & 1)
@@ -153,7 +162,7 @@ void rau_sincos_m(float input_t, float M, float *sin_out, float *cos_out) {
     float frac    = rau_pos - (float)qi_full;
     int   qi      = qi_full & 3;
     float w_raw   = frac;
-    float w_warp  = rwarp(frac);
+    float w_warp  = rau_warpf(frac);
     float w       = w_raw + M * (w_warp - w_raw);  // lerp
 
     // Odd-quadrant reversal: Q1,Q3 → w = 1-w
