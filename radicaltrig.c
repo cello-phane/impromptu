@@ -11,30 +11,11 @@
 
 // Graph of sin/cos/tan and inverse functions - https://www.desmos.com/calculator/gkellct2v2
 
-// NON_UNIFORM_VEL 0 — arc-uniform: warp polynomial applied,
-//                     constant arc speed (π/2 per unit parameter)
-//                     correct for FFT twiddles, motor control, camera pans
-//
-// NON_UNIFORM_VEL 1 — raw linear diagonal projection, no warp,
-//                     faster (one fewer polynomial evaluation + sqrt),
-//                     non-uniform arc speed (peaks 2× at 45°),
-//                     acceptable for rendering, easing, visual effects
+// NON_UNIFORM_VEL 0 — arc-uniform: warp polynomial applied, constant arc speed (π/2 per unit parameter)
+// NON_UNIFORM_VEL 1 — raw linear diagonal projection, no warp, fast, non-uniform in arc
 #define NON_UNIFORM_VEL 0
-//
-// Approximates sin(θ)/(sin(θ)+cos(θ)) for diagonal to arc length stretching
-static float rau_warpf(float t) {
-    static const float C[6] = {
-        0.78539732f, 0.64607089f, 0.63401085f,
-        0.68518412f, 0.32482231f, 1.52006419f
-    };
-    float v = t - 0.5f;
-    float v2 = v * v;
-    float p = C[5];
-    for (int i = 4; i >= 0; --i) p = v2 * p + C[i];
-    return 0.5f + v * p;
-}
 
-// Helpers
+// ── Helper Functions ────────────────────────────────────────
 static float mod4(float a) {
     float r = SDL_fmodf(a, 4.0f);
     if (r < 0.0f) r += 4.0f;
@@ -67,117 +48,47 @@ static inline float rau_sanitize_unit(float x) {
     return x;
 }
 
-// Radical Angle Unit - sincos, accurate to ~ 5 Digits
-void rau_sincos(float input_t, float *sin_out, float *cos_out) {
-    // Input units: RAU (0 to 4 = full revolution)
-    // For radian input: input_t *= (2.0f / M_PI)  before calling
-
-    /* --- Range reduction: fold into [0,1) and integer is a quadrant index --- */
-    float rau_pos = mod4(input_t);
-    int   quadrant_index_full = (int)rau_pos;
-    float frac = rau_pos - (float)quadrant_index_full;
-    int   quadrant_index = quadrant_index_full & 3; // quadrant 0 to 3
-
-    // Warp into w making linear --> arc length
-    #if NON_UNIFORM_VEL
-    float w = frac;
-    #else
-    float w = rau_warpf(frac);
-    #endif
-
-    // Odd-quadrant reversal: Q1,Q3 → w = 1-w
-    if (quadrant_index & 1) w = 1.0f - w;
-
-    // Diagonal to unit circle
-    float omw = 1.0f - w;
-    float D   = omw*omw + w*w;    // = 1 - 2w(1-w)
-    float inv = 1.0f / SDL_sqrtf(D);  // Trig formulae:
-    float cs  = omw * inv;        // (1-w) ÷ sqrt(1 - 2w + 2w^2)
-    float sn  = w   * inv;        //     w ÷ sqrt(1 - 2w + 2w^2)
-
-    // Sign bits from quadrant:
-    // cos negative in Q1,Q2 (qi=1,2): csign bit set when (qi+1)>>1 & 1
-    // sin negative in Q2,Q3 (qi=2,3): ssign bit set when  qi>>1    & 1
-    Uint32 csign = (Uint32)(((quadrant_index+1)>>1) & 1) << 31;
-    Uint32 ssign = (Uint32)( (quadrant_index>>1)    & 1) << 31;
-
-    Uint32 cs_bits = float_to_bits(cs) ^ csign;
-    Uint32 sn_bits = float_to_bits(sn) ^ ssign;
-
-    *cos_out = bits_to_float(cs_bits);
-    *sin_out = bits_to_float(sn_bits);
+// ── Forward Trigonometric Functions ────────────────────────────────────────
+float rau_warpf(float t) {
+    static const float C[6] = {
+        0.78539732f,   /* ≈ π/4  — Remez-confirmed leading coefficient */
+        0.64607089f,
+        0.63401085f,
+        0.68518412f,
+        0.32482231f,
+        1.52006419f
+    };
+    float v  = t - 0.5f;    /* centre on 0 to exploit odd symmetry */
+    float v2 = v * v;
+    float p  = C[5];        /* Nested sum of products in v² (even powers only) */
+    for (int i = 4; i >= 0; --i) p = v2 * p + C[i];
+    return 0.5f + v * p;
 }
 
-// Convenience wrappers
-float rau_sinf(float x) {
-    float s, c;
-    rau_sincos(x, &s, &c);
-    return s;
-}
-
-float rau_cosf(float x) {
-    float s, c;
-    rau_sincos(x, &s, &c);
-    return c;
-}
-
-// Standalone function
-float rau_tanf(float x)
-{
-    // Input units: RAU (0 to 4 = full revolution)
-    // For radian input: x *= (2.0f / M_PI)  before calling
-    float rau_pos = mod4(x);
-    int   quadrant_index_full = (int)rau_pos;
-    float frac = rau_pos - (float)quadrant_index_full;
-    int   quadrant_index = quadrant_index_full & 3; // quadrant 0 to 3
-
-    // warp into w making linear --> arc length
-    #if NON_UNIFORM_VEL
-    float w = frac;
-    #else
-    float w = rau_warpf(frac);
-    #endif
-
-    if (quadrant_index & 1)
-        w = 1.0f - w;
-    float denom = 1.0f - w;
-
-    // optional clamp
-    if (denom < 1e-6f)
-        denom = 1e-6f;
-    float t = w / denom;
-    if (quadrant_index & 1)
-        t = -t;
-
-    return t;
-}
-
-// Hot path version with M to set velocity
-void rau_sincos_m(float input_t, float M, float *sin_out, float *cos_out) {
-    // M=0: NON_UNIFORM_VEL behaviour (linear diagonal)
-    // M=1: arc-uniform behaviour (warp polynomial)
-    // M in between: smooth interpolation — CVT blend
+void rau_sincosf(float input_t, float *sin_out, float *cos_out) {
+    /* Range reduction: fold into [0,4), extract integer quadrant */
     float rau_pos = mod4(input_t);
     int   qi_full = (int)rau_pos;
-    float frac    = rau_pos - (float)qi_full;
-    int   qi      = qi_full & 3;
-    float w_raw   = frac;
-    float w_warp  = rau_warpf(frac);
-    float w       = w_raw + M * (w_warp - w_raw);  // lerp
+    float frac    = rau_pos - (float)qi_full;  /* fractional part ∈ [0,1) */
+    int   qi      = qi_full & 3;               /* quadrant: 0,1,2,3 */
 
-    // Odd-quadrant reversal: Q1,Q3 → w = 1-w
+    /* Arc-length correction (compile-time switch) */
+#if NON_UNIFORM_VEL
+    float w = frac;                /* raw diagonal: non-uniform arc speed */
+#else
+    float w = rau_warpf(frac);     /* warped: uniform arc speed = π/2 per RAU */
+#endif
+
+    /* Odd-quadrant reversal: w increases [0→1] in all quadrants after this */
     if (qi & 1) w = 1.0f - w;
 
-    // Diagonal to unit circle
+    /* Diagonal point to unit circle — single sqrt, both outputs */
     float omw = 1.0f - w;
-    float D   = omw*omw + w*w;    // = 1 - 2w(1-w)
-    float inv = 1.0f / SDL_sqrtf(D);  // Trig formulae:
-    float cs  = omw * inv;        // (1-w) ÷ sqrt(1 - 2w + 2w^2)
-    float sn  = w   * inv;        //     w ÷ sqrt(1 - 2w + 2w^2)
+    float D   = omw*omw + w*w;         /* squared distance from origin to diagonal point */
+    float inv = 1.0f / SDL_sqrtf(D);   /* normalisation factor */
+    float cs  = omw * inv;             /* cos = (1-w)/sqrt(D) */
+    float sn  = w   * inv;             /* sin =    w /sqrt(D) */
 
-    // Sign bits from quadrant:
-    // cos negative in Q1,Q2 (qi=1,2): csign bit set when (qi+1)>>1 & 1
-    // sin negative in Q2,Q3 (qi=2,3): ssign bit set when  qi>>1    & 1
     Uint32 csign = (Uint32)(((qi+1)>>1) & 1) << 31;
     Uint32 ssign = (Uint32)( (qi>>1)    & 1) << 31;
 
@@ -188,118 +99,165 @@ void rau_sincos_m(float input_t, float M, float *sin_out, float *cos_out) {
     *sin_out = bits_to_float(sn_bits);
 }
 
-float rau_arctan_adj(float x) {
+float rau_sinf(float x) {
+    float s, c;
+    rau_sincosf(x, &s, &c);
+    return s;
+}
+
+float rau_cosf(float x) {
+    float s, c;
+    rau_sincosf(x, &s, &c);
+    return c;
+}
+
+float rau_tanf(float x) {
+    float rau_pos = mod4(x);
+    int   qi_full = (int)rau_pos;
+    float frac    = rau_pos - (float)qi_full;
+    int   qi      = qi_full & 3;
+
+#if NON_UNIFORM_VEL
+    float w = frac;
+#else
+    float w = rau_warpf(frac);
+#endif
+
+    if (qi & 1) w = 1.0f - w;
+
+    float denom = 1.0f - w;               /* = cos (without normalisation) */
+    if (denom < 1e-6f) denom = 1e-6f;    /* pole clamp — see note above */
+
+    float t = w / denom;                  /* = tan (sqrt cancels) */
+    if (qi & 1) t = -t;                   /* sign: tan negative in Q1,Q3 */
+    return t;
+}
+
+void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out) {
+    float rau_pos = mod4(input_t);
+    int   qi_full = (int)rau_pos;
+    float frac    = rau_pos - (float)qi_full;
+    int   qi      = qi_full & 3;
+
+    /* Lerp between raw (M=0) and warped (M=1) */
+    float w_raw  = frac;
+    float w_warp = rau_warpf(frac);
+    float w      = w_raw + M * (w_warp - w_raw);
+
+    if (qi & 1) w = 1.0f - w;
+
+    float omw = 1.0f - w;
+    float D   = omw*omw + w*w;
+    float inv = 1.0f / SDL_sqrtf(D);
+    float cs  = omw * inv;
+    float sn  = w   * inv;
+
+    Uint32 csign = (Uint32)(((qi+1)>>1) & 1) << 31;
+    Uint32 ssign = (Uint32)( (qi>>1)    & 1) << 31;
+
+    *cos_out = bits_to_float(float_to_bits(cs) ^ csign);
+    *sin_out = bits_to_float(float_to_bits(sn) ^ ssign);
+}
+
+float rau_arctan_adjf(float x) {
     float x2 = x * x;
     return x * (
         1.000087f
         + x2 * (-0.33288950512027f
-        + x2 * (0.19383271707398f
+        + x2 * ( 0.19383271707398f
         + x2 * (-0.11735031947869f
-        + x2 * (0.05368137843104f
+        + x2 * ( 0.05368137843104f
         + x2 * (-0.01213232131734f)))))
     );
 }
 
-float rau_r_arctan(float ry, float rx, int *err) {
+float rau_r_arctanf(float ry, float rx, int *err) {
     if (err) *err = 0;
     if (ry == 0.0f && rx == 0.0f) {
         if (err) *err = 1;
         return NAN;
     }
-    if (rx == 0.0f) return 1.0f;
+    if (rx == 0.0f) return 1.0f;         /* pure sin-axis: w = 1 */
     float t = SDL_fabsf(ry / rx);
-    return t / (1.0f + t);
+    return t / (1.0f + t);               /* w = tan/(1+tan) — exact rational */
 }
 
-float rau_r_arcsin(float s, int *err) {
+float rau_r_arcsinf(float s, int *err) {
     if (err) *err = 0;
     if (!rau_isfinitef(s) || s < -1.0f || s > 1.0f) {
         if (err) *err = 1;
         return NAN;
     }
-    float sy2 = s * s;
+    float sy2   = s * s;
     float denom = 2.0f * sy2 - 1.0f;
-    if (SDL_fabsf(denom) < 1e-10f) return 0.5f;
-    float disc = SDL_sqrtf(SDL_max(sy2 * (1.0f - sy2), 0.0f));
+    if (SDL_fabsf(denom) < 1e-10f) return 0.5f;   /* 45° singularity guard */
+    float disc  = SDL_sqrtf(SDL_max(sy2 * (1.0f - sy2), 0.0f));
     return SDL_fabsf((sy2 - disc) / denom);
 }
 
-float rau_r_arccos(float c, int *err) {
+float rau_r_arccosf(float c, int *err) {
     if (err) *err = 0;
     if (!rau_isfinitef(c) || c < -1.0f || c > 1.0f) {
         if (err) *err = 1;
         return NAN;
     }
-    float cx2 = c * c;
+    float cx2   = c * c;
     float denom = 2.0f * cx2 - 1.0f;
-    if (SDL_fabsf(denom) < 1e-10f) return 0.5f;
-    float disc = SDL_sqrtf(SDL_max(cx2 * (1.0f - cx2), 0.0f));
+    if (SDL_fabsf(denom) < 1e-10f) return 0.5f;   /* 45° singularity guard */
+    float disc  = SDL_sqrtf(SDL_max(cx2 * (1.0f - cx2), 0.0f));
     return SDL_fabsf((cx2 - 1.0f + disc) / denom);
 }
 
-float rau_invpoly(float w, int *err) {
+float rau_invpolyf(float w, int *err) {
     if (err) *err = 0;
     if (!rau_isfinitef(w) || w < 0.0f || w > 1.0f) {
         if (err) *err = 1;
         return NAN;
     }
-    static const float AC[6] = {
-        1.000087f, -0.33288950512027f, 0.19383271707398f,
-        -0.11735031947869f, 0.05368137843104f, -0.01213232131734f
-    };
     if (w >= 0.5f) {
+        /* reflect: use complementary angle identity π/2 - arctan(1/u) = arctan(u) */
         float u = (1.0f - w) / w;
-        return (float)(M_PI_2 - (u * (
-            AC[0] + (u*u) * (AC[1] + (u*u) * (AC[2] + (u*u) * (AC[3] + (u*u) * (AC[4] + (u*u) * AC[5]))))
-        ))) * (2.0f / (float)M_PI);
+        float a = u * (
+            1.000087f
+            + (u*u) * (-0.33288950512027f
+            + (u*u) * ( 0.19383271707398f
+            + (u*u) * (-0.11735031947869f
+            + (u*u) * ( 0.05368137843104f
+            + (u*u) * (-0.01213232131734f)))))
+        );
+        return ((float)M_PI_2 - a) * (2.0f / (float)M_PI);
     } else {
         float u = w / (1.0f - w);
-        return rau_arctan_adj(u) * (2.0f / (float)M_PI);
+        return rau_arctan_adjf(u) * (2.0f / (float)M_PI);
     }
 }
 
-float rau_full_phi(float ry, float rx, int *err) {
+float rau_atan2f(float ry, float rx, int *err) {
     if (err) *err = 0;
+
+    if (!rau_isfinitef(ry) || !rau_isfinitef(rx)) {
+        if (err) *err = 1;
+        return NAN;
+    }
     if (ry == 0.0f && rx == 0.0f) {
         if (err) *err = 1;
         return NAN;
     }
-    float w = rau_r_arctan(ry, rx, err);
-    if (w==0.0) return NAN;
-    float t = rau_invpoly(w, err);
-    if (t==0.0) return NAN;
 
+    float w = rau_r_arctanf(ry, rx, err);
+    if (err && *err) return NAN;
+
+    float t = rau_invpolyf(w, err);
+    if (err && *err) return NAN;
+
+    /* Quadrant offset + fractional phase.
+     * Q0 [0°- 90°]: t increases forward   (0 + t)
+     * Q1 [90°-180°]: t increases reversed (1 + (1-t))
+     * Q2 [180°-270°]: t increases forward (2 + t)
+     * Q3 [270°-360°]: t increases reversed (3 + (1-t))
+     */
     if (rx >= 0.0f && ry >= 0.0f) return 0.0f + t;
     if (rx <  0.0f && ry >= 0.0f) return 1.0f + (1.0f - t);
     if (rx <  0.0f && ry <  0.0f) return 2.0f + t;
-    return 3.0f + (1.0f - t);
+    return                                 3.0f + (1.0f - t);
 }
-
-/* LICENSE
- [Michael Ledesma - cello-phane@github]
- This is free and unencumbered software released into the public domain.
-
- Anyone is free to copy, modify, publish, use, compile, sell, or
- distribute this software, either in source code form or as a compiled
- binary, for any purpose, commercial or non-commercial, and by any
- means.
-
- In jurisdictions that recognize copyright laws, the author or authors
- of this software dedicate any and all copyright interest in the
- software to the public domain. We make this dedication for the benefit
- of the public at large and to the detriment of our heirs and
- successors. We intend this dedication to be an overt act of
- relinquishment in perpetuity of all present and future rights to this
- software under copyright law.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- OTHER DEALINGS IN THE SOFTWARE.
-
- For more information, please refer to <https://unlicense.org>
-
- */

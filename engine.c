@@ -155,13 +155,13 @@ float _edge(float x1, float y1, float x2, float y2, float x3, float y3) {
 void Engine_run(struct Engine *e) {
     SDL_Log("Engine_run: running engine.");
 
-    int render_inverted_y = 1; //in the case of a model like Shiba.obj
+    int render_inverted_y = 0; //in the case of a model like Shiba.obj
     // Models.
     struct Model *model = Model_from_obj(
         // "models/Shiba.obj",
-        "models/Intergalactic_Spaceships_Version_2.obj",
+        // "models/Intergalactic_Spaceships_Version_2.obj",
         // "models/sphere.obj",
-        // "models/benz.obj",
+        "models/benz.obj",
         0, 0, 1,
         0, 0, 0,
         1, 1, 1
