@@ -216,16 +216,6 @@ void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out);
  *
  * These recover RAU angle parameters from trigonometric ratios.
  * They form the inverse pipeline to rau_sincosf:
- *
- *   rau_sincosf(phi, &s, &c)         forward:  RAU → (cos, sin)
- *   rau_r_arctanf(s, c, &err)        partial:  (cos, sin) → w ∈ [0,1]     EXACT
- *   rau_invpolyf(w, &err)            partial:  w → fractional t ∈ [0,1)   ~3 digits
- *   rau_atan2f(s, c, &err)           full:     (cos, sin) → φ ∈ [0,4)     ~3 digits
- *
- * Range convention — differs from standard atan2:
- *   atan2(y,x)   → (−π, π]    signed, discontinuity at ±180°
- *   rau_atan2f   → [0,  4)    unsigned, wraps continuously at 4 RAU (360°)
- *
  * ══════════════════════════════════════════════════════════════════════════ */
 
 /* rau_arctan_adjf — minimax arctan polynomial, domain [0,1].
@@ -233,10 +223,6 @@ void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out);
  * Approximates arctan(x) for x ∈ [0,1].
  * Nested sum-of-products evaluation in x².  AC[0] ≈ 1.0 and AC[1] ≈ −1/3 are the first two
  * Taylor coefficients of arctan, independently confirmed by the Remez fit.
- *
- * Used internally by rau_invpolyf and rau_atan2f.
- * Not normally called directly — use rau_r_arctanf for the exact rational
- * inverse, or rau_atan2f for full phase recovery.
  *
  * Max error: ~1.69e-4  (~13.2 effective bits, float16 quality)
  */
@@ -268,10 +254,6 @@ float rau_r_arctanf(float ry, float rx, int *err);
  *
  * Solves  sin = w / sqrt((1−w)² + w²)  algebraically for w.
  * No polynomial approximation — uses only arithmetic and one sqrt.
- *
- * Use when only sin is available (e.g. single-channel oscillator output).
- * When both sin and cos are available, prefer rau_r_arctanf — it requires
- * no sqrt and is more accurate.
  *
  * Singularity guard at 45° (sin = 1/√2, where sin = cos):
  *   The denominator 2sin²−1 passes through zero at this point.
@@ -318,43 +300,36 @@ float rau_r_arccosf(float c, int *err);
  */
 float rau_invpolyf(float w, int *err);
 
-/* rau_atan2f — full RAU phase recovery.
- *
+/* rau_atan2f — full RAU phase recovery, analogous to atan2(y, x).
+ * -----------------------------------------------------------------
  * Returns a full-circle phase φ in [0, 4), using the RAU convention:
  *   0   -> +x axis
  *   1   -> +y axis
  *   2   -> -x axis
  *   3   -> -y axis
  *
- * RAU-space analog of atan2, with an unsigned-turn convention
- *
- * Conversion to signed radians or degrees:
- *   signed radians = rau_atan2_signed_radians(rau_atan2f(y, x))
- *   signed degrees = rau_atan2_signed_degrees(rau_atan2f(y, x))
- *
- * Pipeline:
- *   1) normalize the input direction
- *   2) compute reduced ratio with rau_r_arctanf()
- *   3) invert the diagonal warp with rau_invpolyf()
- *   4) reconstruct the quadrant
- *
- * Quadrant reconstruction:
- *   Q0 [0°–90°]:    φ = 0 + t
- *   Q1 [90°–180°]:  φ = 1 + (1 - t)
- *   Q2 [180°–270°]: φ = 2 + t
- *   Q3 [270°–360°]: φ = 3 + (1 - t)
+ * rau_atanf — principal-value inverse tangent, analogous to atan(u).
+ * ------------------------------------------------------------------
+ * Returns a signed value in [-1, 1], where:
+ *   -1 -> -pi/2
+ *    0 -> 0     [analogous to atan(x), normalized to RAU units]
+ *   +1 -> +pi/2
+ * instead of radians.
  *
  * Special cases:
- *   NaN input, zero vector -> err = 1, return NAN
- *   infinite components     -> mapped directly to exact axis/diagonal values
- *
- * Accuracy:
- *   Finite inputs are limited mainly by rau_invpolyf().
- *   rau_r_arctanf() itself is exact up to floating-point rounding.
+ *   NaN      -> err = 1, return NAN
+ *   +/-inf   -> +/-1
+ *   +/-0     -> preserves signed zero
  */
 float rau_atan2f(float ry, float rx, int *err);
+float rau_atanf(float x, int *err);
 
-// Takes result from atan2 and converts to equivalent atan2 ranged result
+/* Conversion helpers:
+   signed radians = rau_atan2_signed_radians(rau_atan2f(y, x))
+   signed degrees  = rau_atan2_signed_degrees(rau_atan2f(y, x))
+   RAU to radians  = rau * (pi / 2)
+   radians to RAU  = rad * (2 / pi)
+ */
 float rau_atan2_signed_radians(float phi_rau);
 float rau_atan2_signed_degs(float phi_rau);
 

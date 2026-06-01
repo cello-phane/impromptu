@@ -5,8 +5,13 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923
+#endif
+
+#ifndef M_2_PI
+#define M_2_PI 0.636619772367581343076
 #endif
 
 // Graph of sin/cos/tan and inverse functions -
@@ -38,7 +43,7 @@ static float bits_to_float(Uint32 u) {
 }
 
 static inline int rau_isfinitef(float x) { return isfinite(x); }
-
+static inline int rau_isnanf(float x) { return isnan(x); }
 static inline int rau_in_unit_range(float x) { return x >= -1.0f && x <= 1.0f; }
 
 static inline float rau_clampf(float x, float lo, float hi) {
@@ -70,16 +75,32 @@ float rau_atan2_signed_degs(float phi_rau) {
 }
 
 // ── Forward Trigonometric Functions ────────────────────────────────────────
-float rau_warpf(float t) {
-  static const float C[6] = {
-      0.78539732f, /* ≈ π/4 — Remez-confirmed leading coefficient */
-      0.64607089f, 0.63401085f, 0.68518412f, 0.32482231f, 1.52006419f};
-  float v = t - 0.5f; /* centre on 0 to exploit odd symmetry */
-  float v2 = v * v;
-  float p = C[5]; /* Nested sum of products in v² (even powers only) */
-  for (int i = 4; i >= 0; --i)
-    p = v2 * p + C[i];
-  return 0.5f + v * p;
+// float rau_warpf(float t) {
+//   static const float C[6] = {
+//       0.78539732f, /* ≈ π/4 — Remez-confirmed leading coefficient */
+//       0.64607089f, 0.63401085f, 0.68518412f, 0.32482231f, 1.52006419f};
+//   float v = t - 0.5f; /* centre on 0 to exploit odd symmetry */
+//   float v2 = v * v;
+//   float p = C[5]; /* Nested sum of products in v² (even powers only) */
+//   for (int i = 4; i >= 0; --i)
+//     p = v2 * p + C[i];
+//   return 0.5f + v * p;
+// }
+
+// Wider bit version than above(but slightly less precise):
+float rau_warpf(float t)
+{
+    static const float C[6] = {
+        0.78539816339744830962f, /* ≈ π/4 — Remez-confirmed leading coefficient */
+        0.64607158024987317298f, 0.63401589172451679138f,
+        0.68515350354689586789f, 0.32501622369042378935f,
+        1.51901679307446258196f};
+    float v  = t - 0.5f; /* centre on 0 to exploit odd symmetry */
+    float v2 = v * v;
+    float p = C[5]; /* Nested sum of products in v² (even powers only) */
+    for (int i = 4; i >= 0; --i)
+        p = v2 * p + C[i];
+    return 0.5f + v * p;
 }
 
 void rau_sincosf(float input_t, float *sin_out, float *cos_out) {
@@ -251,71 +272,120 @@ float rau_r_arccosf(float c, int *err) {
   return SDL_fabsf((cx2 - 1.0f + disc) / denom);
 }
 
-float rau_invpolyf(float w, int *err) {
-  if (err)
-    *err = 0;
-  if (!rau_isfinitef(w) || w < 0.0f || w > 1.0f) {
-    if (err)
-      *err = 1;
-    return NAN;
-  }
-  if (w >= 0.5f) {
-    /* reflect: use complementary angle identity π/2 - arctan(1/u) = arctan(u)
-     */
-    float u = (1.0f - w) / w;
-    float a = u * (1.000087f
-        + (u * u) * (-0.33288950512027f
-        + (u * u) * (0.19383271707398f
-        + (u * u) * (-0.11735031947869f
-        + (u * u) * (0.05368137843104f
-        + (u * u) * (-0.01213232131734f))))));
-    return ((float)M_PI_2 - a) * (2.0f / (float)M_PI);
-  } else {
-    float u = w / (1.0f - w);
-    return rau_arctan_adjf(u) * (2.0f / (float)M_PI);
-  }
+static inline float rau_atanf_polyf(float x)
+{
+    float x2 = x * x;
+    return x * (1.000087f
+        + x2 * (-0.33288950512027f
+        + x2 * ( 0.19383271707398f
+        + x2 * (-0.11735031947869f
+        + x2 * ( 0.05368137843104f
+        + x2 * (-0.01213232131734f))))));
 }
 
-float rau_atan2f(float ry, float rx, int *err) {
-  if (err)
-    *err = 0;
-  if (isnan(rx) || isnan(ry)) {
-    if (err)
-      *err = 1;
-    return NAN;
-  }
-  if (ry == 0.0f && rx == 0.0f) {
-    if (err)
-      *err = 1;
-    return NAN;
-  }
-  if (isinf(ry) || isinf(rx)) {
-    if (isinf(ry) && isinf(rx)) {
-      if (ry > 0.0f && rx > 0.0f)
-        return 0.5f;
-      if (ry > 0.0f && rx < 0.0f)
-        return 1.5f;
-      if (ry < 0.0f && rx < 0.0f)
-        return 2.5f;
-      return 3.5f;
-    }
-    if (isinf(ry)) {
-      return (ry > 0.0f) ? 1.0f : 3.0f;
-    }
-    return (rx > 0.0f) ? 0.0f : 2.0f;
-  }
-  float w = rau_r_arctanf(ry, rx, err);
-  if (err && *err)
-    return NAN;
-  float t = rau_invpolyf(w, err);
-  if (err && *err)
-    return NAN;
+static inline int rau_quadrantf(float y, float x)
+{
+    if (x >= 0.0f) return (y >= 0.0f) ? 0 : 3;
+    return (y >= 0.0f) ? 1 : 2;
+}
 
-  if (rx >= 0.0f && ry >= 0.0f)
-    return 0.0f + t;
-  if (rx < 0.0f && ry >= 0.0f)
-    return 1.0f + (1.0f - t);
-  if (rx < 0.0f && ry < 0.0f)
-    return 2.0f + t;
-  return 3.0f + (1.0f - t);
+static inline float rau_r_normf(float y, float x)
+{
+    if (x == 0.0f) return 1.0f;
+    float t = fabsf(y / x);
+    return t / (1.0f + t);
+}
+
+/* Reduced-domain arctan helper, safe only for finite x/y when x != 0. */
+float rau_invpolyf(float w, int *err)
+{
+    if (err) *err = 0;
+
+    if (!rau_isfinitef(w) || w < 0.0f || w > 1.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+
+    if (w == 0.0f) return 0.0f;
+    if (w == 1.0f) return 1.0f;
+
+    if (w >= 0.5f) {
+        float u = (1.0f - w) / w;
+        float a = rau_atanf_polyf(u);
+        return (M_PI_2 - a) * M_2_PI;
+    } else {
+        float u = w / (1.0f - w);
+        return rau_atanf_polyf(u) * (2.0f / M_PI);
+    }
+}
+
+/* Returns RAU angle in [0,4). 1 RAU = pi/2 radians. */
+float rau_atan2f(float y, float x, int *err)
+{
+    if (err) *err = 0;
+    if (rau_isnanf(x) || rau_isnanf(y)) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    if (x == 0.0f && y == 0.0f) {
+        if (err) *err = 1;
+        return NAN;
+    }
+
+    if (isinf(x) || isinf(y)) {
+        if (isinf(y) && isinf(x)) {
+            if (y > 0.0f && x > 0.0f) return 0.5f;
+            if (y > 0.0f && x < 0.0f) return 1.5f;
+            if (y < 0.0f && x < 0.0f) return 2.5f;
+            return 3.5f;
+        }
+        if (isinf(y)) return (y > 0.0f) ? 1.0f : 3.0f;
+        return (x > 0.0f) ? 0.0f : 2.0f;
+    }
+
+    if (x == 0.0f) {
+        if (y > 0.0f) return 1.0f;
+        if (y < 0.0f) return 3.0f;
+        if (err) *err = 1;
+        return NAN;
+    }
+
+    int q = rau_quadrantf(y, x);
+    float w = rau_r_normf(y, x);
+    float t = rau_invpolyf(w, err);
+    if (err && *err) return NAN;
+
+    if (q == 0) return 0.0f + t;
+    if (q == 1) return 1.0f + (1.0f - t);
+    if (q == 2) return 2.0f + t;
+    return 3.0f + (1.0f - t);
+}
+
+/* Returns (-1, 1), like atan(y/x) but with RAU units. */
+float rau_atanf(float x, int *err)
+{
+    if (err) *err = 0;
+    if (rau_isnanf(x)) {
+        if (err) *err = 1;
+        return NAN;
+    }
+    if (isinf(x)) {
+        return (x > 0.0f) ? 1.0 : -1.0;
+    }
+    if (x == 0.0f) {
+        return x; /* preserves signed zero */
+    }
+
+    float ax = fabsf(x);
+    float w = ax / (1.0f + ax);
+
+    float a;
+    if (w >= 0.5f) {
+        float u = (1.0f - w) / w;
+        a = M_2_PI * (M_PI_2 - rau_atanf_polyf(u));
+    } else {
+        float u = w / (1.0f - w);
+        a = M_2_PI * rau_atanf_polyf(u);
+    }
+    return copysignf(a, x);
 }
