@@ -357,14 +357,14 @@ float rau_atanf(float x, int *err)
         if (err) *err = 1;
         return NAN;
     }
-    if (isinf(x)) {
+    if (!rau_isfinitef(x)) {
         return copysignf(1.0f, x);
     }
     if (x == 0.0f) {
         return x;
     }
 
-    float ax = fabsf(x);
+    float ax = SDL_fabsf(x);
     float u = ax / (1.0f + ax);
 
     float a;
@@ -376,5 +376,5 @@ float rau_atanf(float x, int *err)
         a = rau_atanf_polyf(v) * (2.0f / M_PI);
     }
 
-    return copysignf(a, x);
+    return SDL_copysignf(a, x);
 }
