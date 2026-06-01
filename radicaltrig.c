@@ -2,18 +2,6 @@
 #include "SDL_stdinc.h"
 #include <math.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-#ifndef M_PI_2
-#define M_PI_2 1.57079632679489661923
-#endif
-
-#ifndef M_2_PI
-#define M_2_PI 0.636619772367581343076
-#endif
-
 // Graph of sin/cos/tan and inverse functions -
 // https://www.desmos.com/calculator/gkellct2v2
 
@@ -361,7 +349,7 @@ float rau_atan2f(float y, float x, int *err)
     return 3.0f + (1.0f - t);
 }
 
-/* Returns (-1, 1), like atan(y/x) but with RAU units. */
+/* Returns a signed normalized RAU angle in [-1, 1]. */
 float rau_atanf(float x, int *err)
 {
     if (err) *err = 0;
@@ -370,22 +358,23 @@ float rau_atanf(float x, int *err)
         return NAN;
     }
     if (isinf(x)) {
-        return (x > 0.0f) ? 1.0 : -1.0;
+        return copysignf(1.0f, x);
     }
     if (x == 0.0f) {
-        return x; /* preserves signed zero */
+        return x;
     }
 
     float ax = fabsf(x);
-    float w = ax / (1.0f + ax);
+    float u = ax / (1.0f + ax);
 
     float a;
-    if (w >= 0.5f) {
-        float u = (1.0f - w) / w;
-        a = M_2_PI * (M_PI_2 - rau_atanf_polyf(u));
+    if (u >= 0.5f) {
+        float v = (1.0f - u) / u;
+        a = (M_PI_2 - rau_atanf_polyf(v)) * (2.0f / M_PI);
     } else {
-        float u = w / (1.0f - w);
-        a = M_2_PI * rau_atanf_polyf(u);
+        float v = u / (1.0f - u);
+        a = rau_atanf_polyf(v) * (2.0f / M_PI);
     }
+
     return copysignf(a, x);
 }
