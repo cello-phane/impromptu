@@ -191,16 +191,6 @@ void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out) {
   *sin_out = bits_to_float(float_to_bits(sn) ^ ssign);
 }
 
-float rau_arctan_adjf(float x) {
-  float x2 = x * x;
-  return x * (1.000087f
-        + x2 * (-0.33288950512027f
-        + x2 * (0.19383271707398f
-        + x2 * (-0.11735031947869f
-        + x2 * (0.05368137843104f
-        + x2 * (-0.01213232131734f))))));
-}
-
 float rau_r_arctanf(float ry, float rx, int *err) {
   if (err)
     *err = 0;
