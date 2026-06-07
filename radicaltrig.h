@@ -218,38 +218,6 @@ void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out);
  * They form the inverse pipeline to rau_sincosf:
  * ══════════════════════════════════════════════════════════════════════════ */
 
-/* rau_arctan_adjf — minimax arctan polynomial, domain [0,1].
- *
- * Approximates arctan(x) for x ∈ [0,1].
- * Nested sum-of-products evaluation in x².  AC[0] ≈ 1.0 and AC[1] ≈ −1/3 are the first two
- * Taylor coefficients of arctan, independently confirmed by the Remez fit.
- *
- * Max error: ~1.69e-4  (~13.2 effective bits, float16 quality)
- */
-float rau_arctan_adjf(float x);
-
-/* rau_r_arctanf — exact rational reduction of direction to a diagonal ratio.
- *
- * Returns w in [0,1], where:
- *   w = |y/x| / (1 + |y/x|)
- *
- * This is the reduced direction parameter used by the RAU inverse-angle
- * pipeline. It does not determine quadrant by itself.
- *
- * Interpretation:
- *   w = 0.0  -> x-axis direction within a quadrant
- *   w = 1.0  -> y-axis direction within a quadrant
- *   w = 0.5  -> 45° diagonal (warp fixed point)
- *
- * Special cases:
- *   NaN input           -> err = 1, return NAN
- *   zero vector (0, 0)  -> err = 1, return NAN
- *   infinite components  -> normalized to the corresponding boundary value
- *
- * For full angle recovery including quadrant, use rau_atan2f().
- */
-float rau_r_arctanf(float ry, float rx, int *err);
-
 /* rau_r_arcsinf — algebraic inverse from sin only.  Returns w ∈ [0,1].
  *
  * Solves  sin = w / sqrt((1−w)² + w²)  algebraically for w.
