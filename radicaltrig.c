@@ -250,7 +250,7 @@ float rau_r_arccosf(float c, int *err) {
   return SDL_fabsf((cx2 - 1.0f + disc) / denom);
 }
 
-static inline float rau_atanf_polyf(float x)
+static inline float rau_atanf_sp_polyf(float x)
 {
     float x2 = x * x;
     return x * (1.000087f
@@ -259,6 +259,18 @@ static inline float rau_atanf_polyf(float x)
         + x2 * (-0.11735031947869f
         + x2 * ( 0.05368137843104f
         + x2 * (-0.01213232131734f))))));
+}
+
+static inline float rau_atanf_polyf(float x)
+{
+    float x2 = x * x;
+    return x * (0.9999994300813833f
+        + x2 * (-0.3332707100403806f
+        + x2 * ( 0.1988770404319326f
+        + x2 * (-0.1351294715695766f
+        + x2 * ( 0.0843566600833229f
+        + x2 * (-0.0374368276347488f
+        + x2 *   0.0080026119641338f))))));
 }
 
 static inline int rau_quadrantf(float y, float x)
