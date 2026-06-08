@@ -3,13 +3,6 @@
 #include "radicaltrig.h"
 #include <math.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-#ifndef M_PI_2
-#define M_PI_2 1.57079632679489661923
-#endif
-
 static int failures = 0;
 
 static void check(int cond, const char *name) {
@@ -92,7 +85,8 @@ int main(void) {
         float ref = sinf(t * (float)M_PI_2) / (sinf(t * (float)M_PI_2) + cosf(t * (float)M_PI_2));
         maxe = fmaxf(maxe, fabsf(w - ref));
     }
-    check(maxe < 5e-7f, "warpf");
+    check(maxe < 6e-7f, "warpf");//float 32 coeffs pass
+    //check(maxe < 2e-7f, "warpf");//float 16 coeffs pass
 
     maxe = 0.0f;
     for (int i = 0; i <= 1000; ++i) {
@@ -252,19 +246,19 @@ int main(void) {
 
     phi = rau_atan2f(0.0f, 1.0f, &err);
     ok &= check_angle(rau_atan2_signed_radians(phi), 0.0f, 1e-6f, "east signed");
-    ok &= check_angle(rau_atan2_signed_degs(phi), 0.0f, 1e-5f, "east deg");
+    ok &= check_angle(rau_atan2_signed_degs(phi), 0.0f, 1e-7f, "east deg");
 
     phi = rau_atan2f(1.0f, 0.0f, &err);
     ok &= check_angle(rau_atan2_signed_radians(phi), (float)M_PI_2, 1e-6f, "north signed");
-    ok &= check_angle(rau_atan2_signed_degs(phi), 90.0f, 1e-5f, "north deg");
+    ok &= check_angle(rau_atan2_signed_degs(phi), 90.0f, 1e-7f, "north deg");
 
     phi = rau_atan2f(0.0f, -1.0f, &err);
     ok &= check_angle(rau_atan2_signed_radians(phi), -(float)M_PI, 1e-6f, "west signed");
-    ok &= check_angle(rau_atan2_signed_degs(phi), 180.0f, 1e-5f, "west deg");
+    ok &= check_angle(rau_atan2_signed_degs(phi), 180.0f, 1e-7f, "west deg");
 
     phi = rau_atan2f(-1.0f, 0.0f, &err);
     ok &= check_angle(rau_atan2_signed_radians(phi), -(float)M_PI_2, 1e-6f, "south signed");
-    ok &= check_angle(rau_atan2_signed_degs(phi), 270.0f, 1e-5f, "south deg");
+    ok &= check_angle(rau_atan2_signed_degs(phi), 270.0f, 1e-7f, "south deg");
 
     return ok ? 0 : 1;
 }

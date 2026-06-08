@@ -37,6 +37,18 @@
 extern "C" {
 #endif
 
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923
+#endif
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#ifndef M_2_PI
+#define M_2_PI 0.6366197723675813430
+#endif
+
 /* ── §1 Forward ───────────────────────────────────────────────────────────── */
 
 /* Warp polynomial: linear t ∈ [0,1] → arc-uniform w ∈ [0,1].
