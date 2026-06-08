@@ -250,15 +250,27 @@ float rau_r_arccosf(float c, int *err) {
   return SDL_fabsf((cx2 - 1.0f + disc) / denom);
 }
 
+// Remez minimax, arctan(x)/x over [0,1], degree 3 — 4 terms
+// Max err: 1.18e-4 RAU — float16 quality, minimal cost
 static inline float rau_atanf_sp_polyf(float x)
 {
     float x2 = x * x;
-    return x * (1.000087f
-        + x2 * (-0.33288950512027f
-        + x2 * ( 0.19383271707398f
-        + x2 * (-0.11735031947869f
-        + x2 * ( 0.05368137843104f
-        + x2 * (-0.01213232131734f))))));
+    return x * (0.9998142570f
+        + x2 * (-0.3262377264f
+        + x2 * ( 0.1566730269f
+        + x2 * (-0.0450371370f))));
+}
+
+// Remez minimax, arctan(x)/x over [0,1], degree 4 — 5 terms
+// Max err: 1.67e-5 RAU — half-single precision quality
+static inline float rau_atanf_hsp_polyf(float x)
+{
+    float x2 = x * x;
+    return x * (0.9999737848f
+        + x2 * (-0.3318111223f
+        + x2 * ( 0.1857423872f
+        + x2 * (-0.0927448646f
+        + x2 *   0.0242641934f))));
 }
 
 static inline float rau_atanf_polyf(float x)
