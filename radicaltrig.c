@@ -252,7 +252,7 @@ float rau_r_arccosf(float c, int *err) {
 
 // Remez minimax, arctan(x)/x over [0,1], degree 3 — 4 terms
 // Max err: 1.18e-4 RAU — float16 quality, minimal cost
-static inline float rau_atanf_sp_polyf(float x)
+static inline float rau_atanf_f16_polyf(float x)
 {
     float x2 = x * x;
     return x * (0.9998142570f
