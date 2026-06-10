@@ -72,6 +72,12 @@ void  rau_sincos_mf(float phi, float M, float *sin_out, float *cos_out);
 
 /* ── §2 Inverse ───────────────────────────────────────────────────────────── */
 
+// Extracts the
+float rau_invdiagonal_from_ratio(float ry, float rx);
+float rau_invdiagonal_from_ratio_quotient(float ry_over_rx);
+float rau_invdiagonal_from_y(float ry);
+float rau_invdiagonal_from_x(float rx);
+
 /* Exact rational arctan: w = |ry/rx| / (1 + |ry/rx|) ∈ [0,1].
  * Returns first-quadrant diagonal coordinate. No approximation. */
 float rau_r_arctanf(float ry, float rx, int *err);

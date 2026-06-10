@@ -245,6 +245,87 @@ static inline float rau_atanf_precise_polyf(float x) {
 
 // ── Inverse Functions ──────────────────────────────────────────────────────
 
+// ── Core Coordinate Mapping Kernel ─────────────────────────────────────────
+// Maps a normalized linear diamond distance [0.0, 1.0] to a circular arc length.
+
+static inline float rau_kernel_unwarp(float k) {
+    float u  = k - 0.5f;
+    float u2 = u * u;
+
+    // Core minimax coefficients from your optimization pass
+    float p  = -18.8502046660f;
+    p = u2 * p + 19.4799685220f;
+    p = u2 * p + -10.0240706528f;
+    p = u2 * p + 3.9960544827f;
+    p = u2 * p + -1.6962976022f;
+    p = u2 * p + 1.2732550558f;
+
+    return 0.5f + u * p;
+}
+
+// ── Optimized Drop-In Inverse Variants ──────────────────────────────────────
+
+// ── Drop-In Inverse Variant 1: Pure Diagonal (Arctangent Alternative) ─────
+// Maps raw spatial vectors to single-argument RAU ∈ [-1.0, 1.0]
+float rau_invdiagonal_from_ratio(float ry, float rx) {
+    int err;
+    float k = rau_r_arctanf(ry, rx, &err);
+    if (err) return 0.0f;
+
+    float poly_out = rau_kernel_unwarp(k);
+
+    Uint32 sign = float_to_bits(rx) & 0x80000000u;
+    return bits_to_float(float_to_bits(poly_out) ^ sign);
+}
+
+// ── Drop-In Inverse Variant 1B: Inline Quotient Variant ────────────────────
+// Maps a pre-computed ry/rx slope directly to single-argument RAU ∈ [-1.0, 1.0]
+// Safely bypasses the vector components while preserving singularity protection.
+float rau_invdiagonal_from_ratio_quotient(float ry_over_rx) {
+    // 1. Explicitly catch vertical tracking limits (rx == 0) to prevent NaN quotients
+    if (isinf(ry_over_rx)) {
+        // As slope approaches infinity, k converges to 1.0f.
+        // rau_kernel_unwarp(1.0f) smoothly evaluates to a magnitude of 1.0f RAU.
+        return SDL_copysignf(1.0f, ry_over_rx);
+    }
+    if (isnan(ry_over_rx)) {
+        return 0.0f;
+    }
+    float abs_t = SDL_fabsf(ry_over_rx);
+    float k     = abs_t / (1.0f + abs_t);
+
+    float poly_out = rau_kernel_unwarp(k);
+    return SDL_copysignf(poly_out, ry_over_rx);
+}
+
+// ── Drop-In Inverse Variant 2: From Y-Component (Arcsine Alternative) ──────
+// Maps raw Y coordinate/sine to RAU ∈ [-1.0, 1.0]
+float rau_invdiagonal_from_y(float ry) {
+    int err;
+    float k = rau_r_arcsinf(ry, &err);
+    if (err) return 0.0f;
+
+    float poly_out = rau_kernel_unwarp(k);
+
+    return SDL_copysignf(poly_out, ry);
+}
+
+// ── Drop-In Inverse Variant 3: From X-Component (Arccosine Alternative) ────
+// Maps raw X coordinate/cosine to RAU ∈ [0.0, 2.0] (Principal Arccosine Range)
+float rau_invdiagonal_from_x(float rx) {
+    int err;
+    float k = rau_r_arccosf(rx, &err);
+    if (err) return 0.0f;
+
+    float poly_out = rau_kernel_unwarp(k);
+
+    // Matches Desmos Line 52: { R.x > 0: poly_out, 2.0f - poly_out }
+    if (rx < 0.0f) {
+        return 2.0f - poly_out;
+    }
+    return poly_out;
+}
+
 // rau_r_arctanf — exact rational arctan in RAU ∈ [0,1].
 // Returns |y/x| / (1 + |y/x|) — the RAU diagonal coordinate.
 // This is not an approximation; it is the exact w value for the
@@ -366,7 +447,6 @@ float rau_atan2f(float y, float x, int *err) {
 }
 
 // rau_atanf — single-argument arctan, result in RAU [-1,+1].
-// Uses same quality tier as rau_atan2f.
 float rau_atanf(float x, int *err) {
     if (err) *err = 0;
     if (rau_isnanf(x))     { if (err) *err = 1; return NAN; }
@@ -374,16 +454,12 @@ float rau_atanf(float x, int *err) {
     if (x == 0.0f)         { return x; }
 
     float ax = SDL_fabsf(x);
-    float t  = ax / (1.0f + ax);   /* compactify to [0, 0.5) */
-
     float a;
-    if (t >= 0.5f) {
-        /* ax > 1: reflect via reciprocal */
-        float v = (1.0f - t) / t;
-        a = ((float)M_PI_2 - rau_atanf_polyf(v)) * (float)M_2_PI;
+    if (ax > 1.0f) {
+        /* reflect: arctan(ax) = π/2 - arctan(1/ax) */
+        a = ((float)M_PI_2 - rau_atanf_polyf(1.0f / ax)) * (float)M_2_PI;
     } else {
-        a = rau_atanf_polyf(t / (1.0f - t)) * (float)M_2_PI;
+        a = rau_atanf_polyf(ax) * (float)M_2_PI;
     }
-
     return SDL_copysignf(a, x);
 }
