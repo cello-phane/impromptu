@@ -5,8 +5,7 @@
 // Radical Angle Unit (RAU) trigonometric library
 // Reference: https://www.desmos.com/calculator/gkellct2v2
 //
-// 1 RAU = π/2 radians. Full circle = 4 RAU.
-// Integer quadrant boundaries are exact — no floating point error at 0°/90°/180°/270°.
+// 1 RAU = π/2 radians. Full circle = 4 RAU
 //
 // Accuracy quality tiers (selectable via RAU_ATAN_QUALITY):
 //   0 = f16:     ~1.18e-4 RAU max err — float16 input quality, 4 terms
@@ -67,21 +66,13 @@ float rau_atan2_signed_degs(float phi_rau) {
 // ── Warp Polynomial ────────────────────────────────────────────────────────
 //
 // rau_warpf maps the raw diagonal parameter t ∈ [0,1] to the arc-uniform
-// parameter w = sin(t·π/2) / (sin(t·π/2) + cos(t·π/2)).
+// parameter w = sin(t·π/2) / (sin(t·π/2) + cos(t·π/2))
 //
-// Coefficients: Remez minimax over [0,1], leading term WC[0] ≈ π/4.
-// Derivation: end-to-end SNR minimization on rau_sincosf output.
-// Max err: ~5.6e-7 (float32 quality).
-//
-// Two sets exist — the active set uses fuller float32 bit width:
-//   Active (wider bits, SNR-optimized):
-//     {0.78539816f, 0.64607158f, 0.63401589f, 0.68515350f, 0.32501622f, 1.51901679f}
-//   Alternative (fewer bits, slightly higher peak error):
-//     {0.78539732f, 0.64607089f, 0.63401085f, 0.68518412f, 0.32482231f, 1.52006419f}
-
+// Coefficients: Remez minimax over [0,1]
+// Max err: ~5.6e-7 (float32 quality)
 float rau_warpf(float t) {
     static const float C[6] = {
-        0.78539816339744830962f,  /* ≈ π/4 — Remez leading term */
+        0.78539816339744830962f,
         0.64607158024987317298f,
         0.63401589172451679138f,
         0.68515350354689586789f,
@@ -140,11 +131,10 @@ float rau_cosf(float x) {
     return c;
 }
 
-// rau_tanf — tan via diagonal ratio w/(1-w), sqrt cancels exactly.
-// Sign via bit XOR, consistent with rau_sincosf convention.
+// rau_tanf — tan via diagonal ratio w/(1-w), sqrt cancels exactly
+// Sign via bit XOR, consistent with rau_sincosf convention
 // Note: large absolute error near poles (π/2 + nπ) is unavoidable;
-// sign may flip when w rounds across the w=1 boundary. Use std tan
-// for pole-adjacent inputs.
+// sign may flip when w rounds across the w=1 boundary
 float rau_tanf(float x) {
     float rau_pos = mod4(x);
     int   qi_full = (int)rau_pos;
@@ -170,7 +160,7 @@ float rau_tanf(float x) {
 
 // rau_sincos_mf — morphable sincos: M=0 gives raw diagonal (non-uniform arc),
 // M=1 gives fully warped (arc-uniform). Lerp between the two for
-// smooth transition effects.
+// smooth transition effects
 void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out) {
     float rau_pos = mod4(input_t);
     int   qi_full = (int)rau_pos;
@@ -196,9 +186,9 @@ void rau_sincos_mf(float input_t, float M, float *sin_out, float *cos_out) {
 
 // ── Arctan Polynomial Tiers ────────────────────────────────────────────────
 //
-// All three fit arctan(x)/x as an odd polynomial over [0,1].
-// Caller maps input → [0,1] via the t/(1+t) compactification before calling.
-// Remez minimax derivation — coefficients verified against dense grid.
+// All three fit arctan(x)/x as an odd polynomial over [0,1]
+// Caller maps input → [0,1] via the t/(1+t) compactification before calling
+// Remez minimax derivation — coefficients verified against dense grid
 
 // f16: degree 3, 4 terms — float16 input quality
 // Max err: 1.18e-4 RAU
@@ -246,13 +236,12 @@ static inline float rau_atanf_precise_polyf(float x) {
 // ── Inverse Functions ──────────────────────────────────────────────────────
 
 // ── Core Coordinate Mapping Kernel ─────────────────────────────────────────
-// Maps a normalized linear diamond distance [0.0, 1.0] to a circular arc length.
+// Maps a normalized linear diamond distance [0.0, 1.0] to a circular arc length
 
 static inline float rau_kernel_unwarp(float k) {
     float u  = k - 0.5f;
     float u2 = u * u;
 
-    // Core minimax coefficients from your optimization pass
     float p  = -18.8502046660f;
     p = u2 * p + 19.4799685220f;
     p = u2 * p + -10.0240706528f;
@@ -280,12 +269,12 @@ float rau_invdiagonal_from_ratio(float ry, float rx) {
 
 // ── Drop-In Inverse Variant 1B: Inline Quotient Variant ────────────────────
 // Maps a pre-computed ry/rx slope directly to single-argument RAU ∈ [-1.0, 1.0]
-// Safely bypasses the vector components while preserving singularity protection.
+// Safely bypasses the vector components while preserving singularity protection
 float rau_invdiagonal_from_ratio_quotient(float ry_over_rx) {
     // 1. Explicitly catch vertical tracking limits (rx == 0) to prevent NaN quotients
     if (isinf(ry_over_rx)) {
-        // As slope approaches infinity, k converges to 1.0f.
-        // rau_kernel_unwarp(1.0f) smoothly evaluates to a magnitude of 1.0f RAU.
+        // As slope approaches infinity, k converges to 1.0f
+        // rau_kernel_unwarp(1.0f) smoothly evaluates to a magnitude of 1.0f RAU
         return SDL_copysignf(1.0f, ry_over_rx);
     }
     if (isnan(ry_over_rx)) {
@@ -327,9 +316,7 @@ float rau_invdiagonal_from_x(float rx) {
 }
 
 // rau_r_arctanf — exact rational arctan in RAU ∈ [0,1].
-// Returns |y/x| / (1 + |y/x|) — the RAU diagonal coordinate.
-// This is not an approximation; it is the exact w value for the
-// first-quadrant angle whose tangent is |y/x|.
+// Returns |y/x| / (1 + |y/x|) — the RAU diagonal coordinate
 float rau_r_arctanf(float ry, float rx, int *err) {
     if (err) *err = 0;
     if (isnan(rx) || isnan(ry))       { if (err) *err = 1; return NAN; }
@@ -346,7 +333,7 @@ float rau_r_arctanf(float ry, float rx, int *err) {
 
 // rau_r_arcsinf — rational arcsin in RAU ∈ [0,1].
 // Computes the first-quadrant RAU angle w whose sin equals s.
-// Singularity at s = ±1/√2 (45°): returns 0.5 RAU (exact 45°).
+// Singularity at s = ±1/√2 (45°): returns 0.5 RAU (exact 45°)
 float rau_r_arcsinf(float s, int *err) {
     if (err) *err = 0;
     if (!rau_isfinitef(s) || s < -1.0f || s > 1.0f) {
@@ -361,9 +348,9 @@ float rau_r_arcsinf(float s, int *err) {
     return SDL_fabsf((sy2 - disc) / denom);
 }
 
-// rau_r_arccosf — rational arccos in RAU ∈ [0,1].
-// Computes the first-quadrant RAU angle w whose cos equals c.
-// Singularity at c = ±1/√2 (45°): returns 0.5 RAU (exact 45°).
+// rau_r_arccosf — rational arccos in RAU ∈ [0,1]
+// Computes the first-quadrant RAU angle w whose cos equals c
+// Singularity at c = ±1/√2 (45°): returns 0.5 RAU (exact 45°)
 float rau_r_arccosf(float c, int *err) {
     if (err) *err = 0;
     if (!rau_isfinitef(c) || c < -1.0f || c > 1.0f) {
@@ -379,9 +366,9 @@ float rau_r_arccosf(float c, int *err) {
 }
 
 // rau_invpolyf — convert RAU diagonal coordinate w ∈ [0,1] to RAU angle ∈ [0,1].
-// w is the output of rau_r_arctanf (or rau_r_normf).
-// Internally maps w → raw ratio t = w/(1-w) or (1-w)/w,
-// then evaluates rau_atanf_polyf(t) directly — no double composition.
+// w is the output of rau_r_arctanf (or rau_r_normf)
+// Internally maps w → raw ratio t = w/(1-w) or (1-w)/w
+// then evaluates rau_atanf_polyf(t) directly — no double composition
 float rau_invpolyf(float w, int *err) {
     if (err) *err = 0;
     if (!rau_isfinitef(w) || w < 0.0f || w > 1.0f) {
@@ -403,8 +390,8 @@ float rau_invpolyf(float w, int *err) {
     }
 }
 
-// rau_atan2f — full four-quadrant arctan2, result in RAU [0,4).
-// Accuracy determined by RAU_ATAN_QUALITY (default: float32, 3.62e-7 RAU).
+// rau_atan2f — full four-quadrant arctan2, result in RAU [0,4)
+// Accuracy determined by RAU_ATAN_QUALITY (default: float32, 3.62e-7 RAU)
 float rau_atan2f(float y, float x, int *err) {
     if (err) *err = 0;
     if (rau_isnanf(x) || rau_isnanf(y))  { if (err) *err = 1; return NAN; }
@@ -446,7 +433,7 @@ float rau_atan2f(float y, float x, int *err) {
     return             3.0f + (1.0f - frac);
 }
 
-// rau_atanf — single-argument arctan, result in RAU [-1,+1].
+// rau_atanf — single-argument arctan, result in RAU [-1,+1]
 float rau_atanf(float x, int *err) {
     if (err) *err = 0;
     if (rau_isnanf(x))     { if (err) *err = 1; return NAN; }
