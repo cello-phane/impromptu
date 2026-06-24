@@ -17,7 +17,7 @@
 #define NON_UNIFORM_VEL 0
 
 #ifndef RAU_ATAN_QUALITY
-#define RAU_ATAN_QUALITY 2
+#define RAU_ATAN_QUALITY 0
 #endif
 
 // ── Helper Functions ───────────────────────────────────────────────────────
@@ -199,29 +199,45 @@ static inline float rau_atanf_f16_polyf(float x) {
         + x2 * ( 0.1566730269f
         + x2 * (-0.0450371370f))));
 }
-
+//tested the 2 below at https://godbolt.org/z/Tz6dccone in C++
 // hsp: degree 4, 5 terms — half-single precision
-// Max err: 1.67e-5 RAU
 static inline float rau_atanf_hsp_polyf(float x) {
     float x2 = x * x;
-    return x * (0.9999737848f
+    // Max err: 1.67e-5 RAU
+    /*return x * (0.9999737848f
         + x2 * (-0.3318111223f
         + x2 * ( 0.1857423872f
         + x2 * (-0.0927448646f
         + x2 *   0.0242641934f))));
+    */
+    // Max err: 2.9156e-05
+    return x * (0.9999697079f
+        + x2 * (-0.3317181925f
+        + x2 * ( 0.1851789314f
+        + x2 * (-0.0916479384f
+        + x2 *   0.0236156549f))));
 }
 
 // precise: degree 6, 7 terms — float32 quality
-// Max err: 3.62e-7 RAU
 static inline float rau_atanf_precise_polyf(float x) {
     float x2 = x * x;
-    return x * (0.9999994301f
+    // Max err: 6.8747e-07
+    /*return x * (0.9999994301f
         + x2 * (-0.3332707100f
         + x2 * ( 0.1988770404f
         + x2 * (-0.1351294716f
         + x2 * ( 0.0843566601f
         + x2 * (-0.0374368276f
         + x2 *   0.0080026120f))))));
+    */
+    // Max err: 7.3249e-07
+    return x * (0.9999997567f
+        + x2 * (-0.3332778034f
+        + x2 * (0.1989157444f
+        + x2 * (-0.1351964889f
+        + x2 * (0.0843541706f
+        + x2 * (-0.0373408246f
+        + x2 * (0.0079436085f)))))));
 }
 
 // Dispatch to selected quality tier
