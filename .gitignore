@@ -2,3 +2,8 @@ bin/
 SDL2/
 *.bat
 .clangd
+SDL2.dll
+impromptu.exe
+impromptu_zip/
+radicaltrig_test_cases.py
+test_radicaltrig.exe
