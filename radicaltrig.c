@@ -1,6 +1,7 @@
 #include "radicaltrig.h"
 #include "SDL_stdinc.h"
 #include <math.h>
+#include <immintrin.h>
 
 // Radical Angle Unit (RAU) trigonometric library
 // Reference: https://www.desmos.com/calculator/gkellct2v2
@@ -469,5 +470,6 @@ float rau_atanf(float x, int *err) {
         float inv = 1.0f / ax;              // scalar fallback
     #endif
         a = ((float)M_PI_2 - rau_atanf_polyf(inv)) * (float)M_2_PI;
+    }
     return SDL_copysignf(a, x);
 }
