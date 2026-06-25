@@ -18,7 +18,7 @@
 #define NON_UNIFORM_VEL 0
 
 #ifndef RAU_ATAN_QUALITY
-#define RAU_ATAN_QUALITY 2 //precise
+#define RAU_ATAN_QUALITY 2 // 2 (precise is default)
 #endif
 
 // ── Helper Functions ───────────────────────────────────────────────────────
@@ -460,7 +460,7 @@ float rau_atanf(float x, int *err) {
 
     float ax = SDL_fabsf(x);
     float a;
-    if (ax > 1.0f) {
+    if (ax > 1.0f) { // SIMD if available
     #ifdef __SSE__
         float inv;
         __m128 v = _mm_set_ss(ax);
