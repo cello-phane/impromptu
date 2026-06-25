@@ -7,17 +7,17 @@
 //
 // 1 RAU = π/2 radians. Full circle = 4 RAU
 //
-// Accuracy quality tiers (selectable via RAU_ATAN_QUALITY):
-//   0 = f16:     ~1.18e-4 RAU max err — float16 input quality, 4 terms
-//   1 = hsp:     ~1.67e-5 RAU max err — half-single precision,  5 terms
-//   2 = precise: ~3.62e-7 RAU max err — float32 quality,        7 terms (default)
+// Accuracy quality tiers (selectable via RAU_ATAN_QUALITY as 0, 1, or 2):
+// 0 = f16 (1.18e-4)
+// 1 = hsp (2.92e-5)
+// 2 = precise (7.32e-7, join=9.74e-11)
 //
 // NON_UNIFORM_VEL 0 — arc-uniform: warp polynomial applied, π/2 arc per RAU
 // NON_UNIFORM_VEL 1 — raw diagonal projection, no warp, non-uniform arc speed
 #define NON_UNIFORM_VEL 0
 
 #ifndef RAU_ATAN_QUALITY
-#define RAU_ATAN_QUALITY 0
+#define RAU_ATAN_QUALITY 2 //precise
 #endif
 
 // ── Helper Functions ───────────────────────────────────────────────────────
@@ -218,7 +218,8 @@ static inline float rau_atanf_hsp_polyf(float x) {
         + x2 *   0.0236156549f))));
 }
 
-// precise: degree 6, 7 terms — float32 quality
+// precise: degree 6, 7 terms
+// Max err: 7.32e-7 rad | Join gap at x=1: 9.74e-11 (constrained, was 5.70e-7)
 static inline float rau_atanf_precise_polyf(float x) {
     float x2 = x * x;
     // Max err: 6.8747e-07
@@ -459,10 +460,14 @@ float rau_atanf(float x, int *err) {
     float ax = SDL_fabsf(x);
     float a;
     if (ax > 1.0f) {
-        /* reflect: arctan(ax) = π/2 - arctan(1/ax) */
-        a = ((float)M_PI_2 - rau_atanf_polyf(1.0f / ax)) * (float)M_2_PI;
-    } else {
-        a = rau_atanf_polyf(ax) * (float)M_2_PI;
-    }
+    #ifdef __SSE__
+        float inv;
+        __m128 v = _mm_set_ss(ax);
+        _mm_store_ss(&inv, _mm_rcp_ss(v));  // ~12-bit approx, 1 cycle
+        inv = inv * (2.0f - ax * inv);       // Newton step → ~23-bit, 2 FMAs
+    #else
+        float inv = 1.0f / ax;              // scalar fallback
+    #endif
+        a = ((float)M_PI_2 - rau_atanf_polyf(inv)) * (float)M_2_PI;
     return SDL_copysignf(a, x);
 }
