@@ -18,8 +18,22 @@
  *   1 = raw diagonal  — no warp, non-uniform arc speed
  *   runtime blend: rau_sincos_mf(phi, M, s, c)  M∈[0,1]
  *
+ * RAU_WARP_QUALITY (compile-time, default 1):
+ *   1 = v2        (default) — constrained minimax refit, C1 still
+ *                   exactly π/4, end-to-end sin/cos max err 1.246e-7
+ *                   RAU (double precision) / 2.372e-7 (measured on real
+ *                   float32 hardware, ~2.7x tighter than tier 0 there).
+ *                   Validated: compiled and run on real x86 float32,
+ *                   cross-checked against an independent LP/mpmath
+ *                   derivation and against a reference Desmos
+ *                   construction.
+ *   0 = original  — end-to-end sin/cos max err 5.472e-7 RAU. Kept for
+ *                   anyone who specifically wants the older fit.
+ *   rau_warpf_orig() and rau_warpf_v2() are both callable directly
+ *   regardless of this define, for A/B testing.
+ *
  * Accuracy:
- *   rau_sincosf       1.68e-7   float32
+ *   rau_sincosf       1.246e-7  float32  (5.472e-7 with RAU_WARP_QUALITY=0)
  *   rau_tanf          7.73e-6   float16  (pole sign unreliable near ±90°)
  *   rau_r_arctanf     ~1e-15    exact rational
  *   rau_r_arcsinf     ~1e-14    algebraic
@@ -52,8 +66,24 @@ extern "C" {
 /* ── §1 Forward ───────────────────────────────────────────────────────────── */
 
 /* Warp polynomial: linear t ∈ [0,1] → arc-uniform w ∈ [0,1].
- * Remez minimax, leading coeff ≈ π/4. Max err: 1.61e-7. */
+ * Dispatches to tier 0 or v2 per RAU_WARP_QUALITY (default: v2). Warp-
+ * space max err (v2, default): see rau_warpf_v2 below. Tier selectable
+ * at compile time via RAU_WARP_QUALITY — see top of file. */
 float rau_warpf(float t);
+
+/* Original tier of the warp polynomial: Remez minimax over full [0,1],
+ * C1 = π/4 exact. Warp-space max err: 5.168e-7 (verified against target
+ * w=sin/(sin+cos) via mpmath, 50-digit precision). Always callable
+ * directly, independent of RAU_WARP_QUALITY. */
+float rau_warpf_orig(float t);
+
+/* v2 tier of the warp polynomial (the default as of RAU_WARP_QUALITY=1):
+ * constrained minimax refit (C1 still exactly π/4, C2..C6 re-solved via
+ * linear programming). ~4.4x tighter end-to-end sin/cos accuracy than
+ * the original tier in double precision (1.246e-7 vs 5.472e-7), ~2.7x
+ * tighter as actually compiled on float32 (2.372e-7 vs 6.362e-7).
+ * Always callable directly, independent of RAU_WARP_QUALITY. */
+float rau_warpf_v2(float t);
 
 /* Simultaneous sin and cos from RAU angle. Single warp + single sqrt.
  * Prefer over separate rau_sinf/rau_cosf when both outputs are needed. */

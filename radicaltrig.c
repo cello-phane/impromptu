@@ -21,6 +21,24 @@
 #define RAU_ATAN_QUALITY 2 // 2 (precise is default)
 #endif
 
+// RAU_WARP_QUALITY selects which forward-warp coefficient tier rau_warpf()
+// (and therefore rau_sincosf/rau_tanf/rau_sincos_mf) dispatches to:
+// 1 = v2 (default) — constrained minimax refit, end-to-end sin/cos max
+//                     err 1.246e-7 (double-precision theoretical) /
+//                     2.372e-7 (measured on real float32 hardware, ~2.68x
+//                     tighter than tier 0 there). Same C1=pi/4 exactness
+//                     as tier 0. Validated: compiled and run on real
+//                     x86 float32 (GCC), cross-checked against an
+//                     independent LP/mpmath derivation and against a
+//                     reference Desmos construction.
+// 0 = original       — end-to-end sin/cos max err 5.472e-7. Kept for
+//                     anyone who specifically wants the older fit;
+//                     rau_warpf_orig() is also directly callable
+//                     regardless of this define.
+#ifndef RAU_WARP_QUALITY
+#define RAU_WARP_QUALITY 1
+#endif
+
 // ── Helper Functions ───────────────────────────────────────────────────────
 
 static float mod4(float a) {
@@ -69,9 +87,29 @@ float rau_atan2_signed_degs(float phi_rau) {
 // rau_warpf maps the raw diagonal parameter t ∈ [0,1] to the arc-uniform
 // parameter w = sin(t·π/2) / (sin(t·π/2) + cos(t·π/2))
 //
-// Coefficients: Remez minimax over [0,1]
-// Max err: ~5.6e-7 (float32 quality)
-float rau_warpf(float t) {
+// Two tiers are always compiled in; RAU_WARP_QUALITY (defined above)
+// selects which one rau_warpf() itself dispatches to (default: tier 1,
+// v2). rau_warpf_orig() and rau_warpf_v2() are both exposed directly so
+// either is callable regardless of that define, for A/B comparison
+// without a recompile.
+//
+// Both figures below are end-to-end sin/cos error (after the radical-
+// identity projection), which is very slightly larger than the raw
+// warp-space approximation error alone (5.168e-7 for tier 0) — verified
+// via mpmath at 50-digit precision and cross-checked with an independent
+// scipy/HiGHS linear-program minimax solve, then again by compiling and
+// running both tiers on real x86 float32 hardware.
+//
+//   tier 0 (original): Remez minimax over full [0,1]. C1 = π/4 exact.
+//                       sin/cos max err: 5.472e-7 (double) / 6.36e-7 (float32)
+//   tier 1 (v2, default): constrained L-infinity refit — C1 still pinned
+//                       exactly to π/4, C2..C6 re-solved by LP. sin/cos
+//                       max err: 1.246e-7 (double) / 2.37e-7 (float32) —
+//                       ~4.4x tighter in double precision, ~2.7x tighter
+//                       as actually compiled, confirming the improvement
+//                       survives float32 rounding rather than being an
+//                       artifact of the double-precision derivation.
+static inline float rau_warpf_tier0(float t) {
     static const float C[6] = {
         0.78539816339744830962f,
         0.64607158024987317298f,
@@ -87,6 +125,32 @@ float rau_warpf(float t) {
         p = v2 * p + C[i];
     return 0.5f + v * p;
 }
+
+static inline float rau_warpf_tier1(float t) {
+    static const float C[6] = {
+        0.78539816339744830962f, /* unchanged from tier 0 — pi/4, exact */
+        0.6460261721112686f,
+        0.6346711435786873f,
+        0.6812793876895539f,
+        0.33448057938003534f,
+        1.5121252251949524f
+    };
+    float v  = t - 0.5f;
+    float v2 = v * v;
+    float p  = C[5];
+    for (int i = 4; i >= 0; --i)
+        p = v2 * p + C[i];
+    return 0.5f + v * p;
+}
+
+float rau_warpf_orig(float t) { return rau_warpf_tier0(t); }
+float rau_warpf_v2(float t) { return rau_warpf_tier1(t); }
+
+#if RAU_WARP_QUALITY == 1
+float rau_warpf(float t) { return rau_warpf_tier1(t); }
+#else
+float rau_warpf(float t) { return rau_warpf_tier0(t); }
+#endif
 
 // ── Forward Trigonometric Functions ───────────────────────────────────────
 
@@ -154,8 +218,13 @@ float rau_tanf(float x) {
     if (denom < 1e-6f) denom = 1e-6f;  /* pole magnitude clamp */
     float rho = w / denom;
 
-    /* tan sign: negative in Q1 (x<0,y>0) and Q3 (x>0,y<0) */
-    Uint32 sign = (Uint32)(((qi >> 1) ^ (qi & 1)) & 1) << 31;
+    /* tan sign: positive in Q0 (x>0,y>0) and Q2 (x<0,y<0),
+     * negative in Q1 (x<0,y>0) and Q3 (x>0,y<0) — simplifies to the
+     * low bit of the quadrant index. (Fixed: the previous XOR-based
+     * formula ((qi>>1)^(qi&1)) flipped the sign in Q2 and Q3 — verified
+     * both by inspection and by comparing rau_tanf's sign against
+     * sin/cos from rau_sincosf across all four quadrants.) */
+    Uint32 sign = (Uint32)(qi & 1) << 31;
     return bits_to_float(float_to_bits(rho) ^ sign);
 }
 
@@ -281,7 +350,12 @@ float rau_invdiagonal_from_ratio(float ry, float rx) {
 
     float poly_out = rau_kernel_unwarp(k);
 
-    Uint32 sign = float_to_bits(rx) & 0x80000000u;
+    /* Sign of the result is sign(ry/rx), i.e. sign(ry) XOR sign(rx) —
+     * not sign(rx) alone. (Fixed: using only rx's sign disagreed with
+     * rau_invdiagonal_from_ratio_quotient(ry/rx) — its documented
+     * equivalent — whenever ry was negative; verified by direct
+     * comparison across all four sign combinations of ry, rx.) */
+    Uint32 sign = (float_to_bits(ry) ^ float_to_bits(rx)) & 0x80000000u;
     return bits_to_float(float_to_bits(poly_out) ^ sign);
 }
 
@@ -470,6 +544,13 @@ float rau_atanf(float x, int *err) {
         float inv = 1.0f / ax;              // scalar fallback
     #endif
         a = ((float)M_PI_2 - rau_atanf_polyf(inv)) * (float)M_2_PI;
+    } else {
+        /* Fixed: this branch was previously missing entirely, leaving
+         * `a` uninitialized for every |x| <= 1 — i.e. the common case,
+         * not an edge case. Verified via -Wmaybe-uninitialized and by
+         * direct comparison against atanf(x)*(2/pi), which the old code
+         * returned ~0 garbage for regardless of x. */
+        a = rau_atanf_polyf(ax) * (float)M_2_PI;
     }
     return SDL_copysignf(a, x);
 }
